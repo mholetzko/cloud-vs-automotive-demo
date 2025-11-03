@@ -6,8 +6,111 @@
     <title>Budget Configuration • Matthias Holetzko</title>
     <link rel="stylesheet" href="/static/style.css" />
     <style>
-      .header-nav { margin: 12px 0; }
-      .header-nav a { color: var(--mb-blue); text-decoration: none; font-weight: 600; }
+      body {
+        background: #fafafa;
+      }
+      .config-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 48px;
+      }
+      .config-header {
+        margin-bottom: 32px;
+      }
+      .config-header h1 {
+        font-size: 36px;
+        font-weight: 200;
+        margin: 0 0 16px 0;
+        color: #000;
+      }
+      .config-header p {
+        font-size: 15px;
+        color: #666;
+        margin: 0;
+      }
+      .config-grid {
+        display: grid;
+        gap: 24px;
+      }
+      .config-item {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 0;
+        padding: 32px;
+        transition: border-color 0.3s;
+      }
+      .config-item:hover {
+        border-color: var(--mb-blue);
+      }
+      .config-item h3 {
+        font-size: 18px;
+        font-weight: 400;
+        margin: 0 0 24px 0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #000;
+      }
+      .config-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+      }
+      .config-field {
+        display: flex;
+        flex-direction: column;
+      }
+      .config-field label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #666;
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+      .config-field input {
+        padding: 12px;
+        border: 1px solid #e0e0e0;
+        background: #fafafa;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+      .config-field input:focus {
+        outline: none;
+        border-color: var(--mb-blue);
+        background: white;
+      }
+      .config-actions {
+        margin-top: 24px;
+        display: flex;
+        gap: 12px;
+      }
+      .btn-save {
+        background: #000;
+        color: white;
+        border: none;
+        padding: 12px 32px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: background 0.3s;
+        font-weight: 500;
+      }
+      .btn-save:hover {
+        background: var(--mb-blue);
+        color: #000;
+      }
+      .message {
+        padding: 16px;
+        margin-top: 16px;
+        font-size: 13px;
+        border-left: 3px solid var(--mb-blue);
+        background: #f0f9ff;
+      }
+      .message.error {
+        border-left-color: #d32f2f;
+        background: #ffebee;
+      }
     </style>
   </head>
   <body>
@@ -20,13 +123,12 @@
         <a href="https://github.com/mholetzko/cloud-vs-automotive-demo" target="_blank">GitHub</a>
       </nav>
     </header>
-    <main class="container">
-      <div class="header-nav"><a href="/">← Back to app</a></div>
-      <div class="panel">
-        <h2>Budget Settings</h2>
-        <div class="sub">Configure total licenses, commit (fixed budget), max overage, and pricing per tool</div>
-        <div id="config-list"></div>
+    <main class="config-container">
+      <div class="config-header">
+        <h1>Budget Configuration</h1>
+        <p>Configure total licenses, commit budgets, max overage limits, and pricing per tool</p>
       </div>
+      <div class="config-grid" id="config-list"></div>
     </main>
     <footer class="footer">
       <div>© 2025 Matthias Holetzko • Cloud License Server Demo</div>
@@ -40,37 +142,34 @@
           out.innerHTML = '';
           data.tools.forEach(t => {
             const card = document.createElement('div');
-            card.style.border = '1px solid var(--mb-gray-300)';
-            card.style.borderRadius = '8px';
-            card.style.padding = '12px';
-            card.style.marginBottom = '12px';
+            card.className = 'config-item';
             card.innerHTML = `
               <h3>${t.tool}</h3>
-              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap:12px; align-items:end; margin-top:8px">
-                <label>
-                  Total licenses
+              <div class="config-form">
+                <div class="config-field">
+                  <label>Total Licenses</label>
                   <input type="number" id="total-${t.tool}" value="${t.total}" min="1" />
-                </label>
-                <label>
-                  Commit (fixed budget)
+                </div>
+                <div class="config-field">
+                  <label>Commit Budget</label>
                   <input type="number" id="commit-${t.tool}" value="${t.commit}" min="0" />
-                </label>
-                <label>
-                  Max overage
+                </div>
+                <div class="config-field">
+                  <label>Max Overage</label>
                   <input type="number" id="overage-${t.tool}" value="${t.max_overage}" min="0" />
-                </label>
-                <label>
-                  Commit price ($)
+                </div>
+                <div class="config-field">
+                  <label>Commit Price ($)</label>
                   <input type="number" id="commit-price-${t.tool}" value="${t.commit_price || 0}" min="0" step="0.01" />
-                </label>
-                <label>
-                  Overage price/license ($)
+                </div>
+                <div class="config-field">
+                  <label>Overage Price ($)</label>
                   <input type="number" id="overage-price-${t.tool}" value="${t.overage_price_per_license || 0}" min="0" step="0.01" />
-                </label>
+                </div>
               </div>
-              <div style="margin-top:8px">
-                <button class="btn primary" onclick="saveConfig('${t.tool}')">Save</button>
-                <span id="msg-${t.tool}" class="result" style="margin-left:8px"></span>
+              <div class="config-actions">
+                <button class="btn-save" onclick="saveConfig('${t.tool}')">Save Changes</button>
+                <span id="msg-${t.tool}" class="message" style="display:none"></span>
               </div>
             `;
             out.appendChild(card);
@@ -86,7 +185,8 @@
         const commitPrice = parseFloat(document.getElementById(`commit-price-${tool}`).value);
         const overagePrice = parseFloat(document.getElementById(`overage-price-${tool}`).value);
         const msg = document.getElementById(`msg-${tool}`);
-        msg.className = 'result';
+        msg.className = 'message';
+        msg.style.display = 'block';
         msg.textContent = 'Saving...';
         try {
           const r = await fetch('/config/budget', {
@@ -98,12 +198,11 @@
             const err = await r.json();
             throw new Error(err.detail || 'Save failed');
           }
-          msg.classList.add('success');
-          msg.textContent = 'Saved';
-          setTimeout(() => { msg.textContent = ''; }, 2000);
+          msg.textContent = '✓ Saved successfully';
+          setTimeout(() => { msg.style.display = 'none'; }, 3000);
         } catch (e) {
-          msg.classList.add('error');
-          msg.textContent = e.message || 'Save failed';
+          msg.className = 'message error';
+          msg.textContent = '✗ ' + (e.message || 'Save failed');
         }
       }
       loadConfig();
