@@ -209,7 +209,9 @@ The presentation (`/presentation`) covers:
 4. **Speed & Certainty** - Minutes vs weeks to triage
 5. **Bridging the Gap** - How to bring cloud practices to edge/IoT
 
-## 🎮 Demo Client
+## 🎮 Demo Client & Load Testing
+
+### Quick Demo Client
 
 Test the license server from any machine using the included Python client:
 
@@ -225,6 +227,52 @@ python scripts/demo_client.py --url https://license-server-demo.fly.dev --loop 1
 ```
 
 See [scripts/README.md](scripts/README.md) for full documentation.
+
+### 🔥 High-Performance Stress Testing (Rust)
+
+**NEW:** Parallel stress testing tool with real-time progress and detailed metrics:
+
+```bash
+cd stress-test
+./run_stress_test.sh
+```
+
+**Features:**
+- ⚡ **Parallel execution** - Up to 50+ concurrent workers
+- 📊 **Real-time progress** - Visual progress bars
+- 🎯 **Load profiles** - Light/Medium/Heavy/Extreme
+- 📈 **Detailed metrics** - Success rates, throughput, timing
+- 🎨 **Beautiful output** - Colored terminal with stats
+
+**Quick example:**
+```bash
+# Heavy load on Fly.io
+cd stress-test
+cargo run --release -- \
+    --url https://license-server-demo.fly.dev \
+    --workers 20 \
+    --operations 100 \
+    --hold-time 1
+```
+
+See [stress-test/README.md](stress-test/README.md) for full documentation.
+
+### 📚 Multi-Language Client Libraries
+
+Integrate license management into your applications:
+
+```bash
+# Interactive launcher for all clients
+./clients/launch_examples.sh
+```
+
+**Available languages:**
+- 🐍 **Python** - Context managers, type hints, auto-venv
+- 🔷 **C** - ANSI C, libcurl, minimal deps
+- 🔷 **C++** - Modern C++17, RAII, exception handling
+- 🦀 **Rust** - Async/await, tokio, memory-safe
+
+See [clients/README.md](clients/README.md) for integration guides.
 
 ## 📁 Project Structure
 
@@ -250,6 +298,17 @@ See [scripts/README.md](scripts/README.md) for full documentation.
 │   ├── local_devops_demo.sh # Local CI simulation
 │   ├── demo_client.py       # Demo client for testing
 │   └── README.md            # Client documentation
+├── stress-test/             # 🆕 High-performance load testing
+│   ├── src/main.rs          # Rust stress test tool
+│   ├── run_stress_test.sh   # Interactive launcher
+│   └── README.md            # Load testing documentation
+├── clients/                 # 🆕 Multi-language client libraries
+│   ├── python/              # Python client with auto-venv
+│   ├── c/                   # C client (libcurl)
+│   ├── cpp/                 # C++ client (C++17)
+│   ├── rust/                # Rust client (async/tokio)
+│   ├── launch_examples.sh   # Master launcher
+│   └── README.md            # Client library docs
 ├── docker-compose.yml       # Full stack orchestration
 ├── Dockerfile               # App container
 ├── fly.toml                 # Fly.io deployment config
