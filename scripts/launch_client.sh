@@ -27,11 +27,26 @@ fi
 
 echo -e "${GREEN}✅ Python 3 found: $(python3 --version)${NC}"
 
+# Setup virtual environment
+VENV_DIR="${SCRIPT_DIR}/.venv_client"
+
+if [ ! -d "${VENV_DIR}" ]; then
+    echo -e "${BLUE}Creating virtual environment...${NC}"
+    python3 -m venv "${VENV_DIR}"
+    echo -e "${GREEN}✅ Virtual environment created${NC}"
+else
+    echo -e "${GREEN}✅ Virtual environment found${NC}"
+fi
+
+# Activate virtual environment
+echo -e "${BLUE}Activating virtual environment...${NC}"
+source "${VENV_DIR}/bin/activate"
+
 # Check if requests library is installed
-if ! python3 -c "import requests" &> /dev/null; then
+if ! python -c "import requests" &> /dev/null 2>&1; then
     echo -e "${YELLOW}⚠️  requests library not found${NC}"
     echo -e "${BLUE}Installing requests...${NC}"
-    pip3 install requests
+    pip install --quiet requests
     echo -e "${GREEN}✅ requests installed${NC}"
 else
     echo -e "${GREEN}✅ requests library found${NC}"
@@ -77,17 +92,17 @@ case $mode_choice in
     1)
         echo -e "${GREEN}→ Launching interactive mode...${NC}"
         echo ""
-        python3 "${CLIENT_SCRIPT}" --url "${SERVER_URL}" --interactive
+        python "${CLIENT_SCRIPT}" --url "${SERVER_URL}" --interactive
         ;;
     2)
         echo -e "${GREEN}→ Running quick simulation...${NC}"
         echo ""
-        python3 "${CLIENT_SCRIPT}" --url "${SERVER_URL}"
+        python "${CLIENT_SCRIPT}" --url "${SERVER_URL}"
         ;;
     3)
         echo -e "${GREEN}→ Running stress test (10 cycles)...${NC}"
         echo ""
-        python3 "${CLIENT_SCRIPT}" --url "${SERVER_URL}" --loop 10 --duration 2
+        python "${CLIENT_SCRIPT}" --url "${SERVER_URL}" --loop 10 --duration 2
         ;;
     4)
         read -p "Enter tool name (or press Enter for all): " tool
@@ -101,7 +116,7 @@ case $mode_choice in
         echo -e "${GREEN}→ Running custom simulation...${NC}"
         echo ""
         
-        cmd="python3 \"${CLIENT_SCRIPT}\" --url \"${SERVER_URL}\" --user \"${username}\" --duration ${duration} --loop ${loops}"
+        cmd="python \"${CLIENT_SCRIPT}\" --url \"${SERVER_URL}\" --user \"${username}\" --duration ${duration} --loop ${loops}"
         
         if [ -n "$tool" ]; then
             cmd="${cmd} --tool \"${tool}\""
@@ -112,9 +127,12 @@ case $mode_choice in
     *)
         echo -e "${RED}Invalid choice, running quick simulation${NC}"
         echo ""
-        python3 "${CLIENT_SCRIPT}" --url "${SERVER_URL}"
+        python "${CLIENT_SCRIPT}" --url "${SERVER_URL}"
         ;;
 esac
+
+# Deactivate virtual environment
+deactivate
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
