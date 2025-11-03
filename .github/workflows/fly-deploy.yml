@@ -1,18 +1,79 @@
-# See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+name: Deploy to Fly.io
 
-name: Fly Deploy
 on:
   push:
     branches:
       - main
+    paths:
+      - 'app/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'fly.toml'
+      - '.github/workflows/fly-deploy.yml'
+  workflow_dispatch:  # Allow manual triggers
+
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false  # Don't cancel deployments in progress
+
 jobs:
   deploy:
-    name: Deploy app
+    name: Deploy to Fly.io
     runs-on: ubuntu-latest
-    concurrency: deploy-group    # optional: ensure only one action runs at a time
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Verify Deployment
+        run: |
+          echo "✅ Deployment complete!"
+          echo "🌐 Live URL: https://license-server-demo.fly.dev"
+          echo "📊 Metrics Dashboard: https://license-server-demo.fly.dev/metrics-dashboard"
+          echo "🎯 Presentation: https://license-server-demo.fly.dev/presentation"
+          
+          # Wait a few seconds for the app to start
+          sleep 5
+          
+          # Basic health check
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://license-server-demo.fly.dev/licenses/status || echo "000")
+          
+          if [ "$STATUS_CODE" = "200" ]; then
+            echo "✅ Health check passed (HTTP $STATUS_CODE)"
+          else
+            echo "⚠️  Health check returned HTTP $STATUS_CODE"
+            exit 1
+          fi
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `
+              ## 🚀 Deployed to Fly.io
+              
+              **Live URLs:**
+              - 🏠 Dashboard: https://license-server-demo.fly.dev
+              - 📊 Metrics: https://license-server-demo.fly.dev/metrics-dashboard
+              - 🎯 Presentation: https://license-server-demo.fly.dev/presentation
+              - 📖 API Docs: https://license-server-demo.fly.dev/docs
+              
+              **Test it:**
+              \`\`\`bash
+              curl https://license-server-demo.fly.dev/licenses/status | jq
+              \`\`\`
+              `
+            })
