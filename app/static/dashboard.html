@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cloud License Server • Matthias Holetzko</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header class="mb-header">
+      <div class="mb-brand">☁️ Cloud License Server</div>
+      <div class="mb-sub">by Matthias Holetzko • <a href="/" style="color:#00adef;text-decoration:none">🏠 Home</a> • <a href="/presentation" style="color:#00adef;text-decoration:none">📊 Presentation</a> • <a href="/config" style="color:#00adef;text-decoration:none">Budget Config</a> • <a href="https://github.com/mholetzko/cloud-vs-automotive-demo/tree/main/clients" target="_blank" style="color:#00adef;text-decoration:none">💻 Client Libraries</a> • <a href="https://mholetzko.grafana.net/public-dashboards/f6b98ade7fc34d36b2c27ee84ba1b7c9" target="_blank" style="color:#00adef;text-decoration:none">📈 Grafana Dashboard</a></div>
+    </header>
+
+    <main class="container">
+      <div id="app-panels">
+      <section class="panel">
+        <h2>Borrow a license</h2>
+        <form id="borrow-form">
+          <label>
+            Tool
+            <select id="borrow-tool">
+              <option value="cad_tool">CAD Tool</option>
+              <option value="simulation">Simulation</option>
+              <option value="analysis">Analysis</option>
+            </select>
+          </label>
+          <label>
+            User
+            <input id="borrow-user" type="text" placeholder="e.g. alice" required />
+          </label>
+          <button id="borrow-btn" type="submit" class="btn primary">Borrow</button>
+        </form>
+        <div id="borrow-result" class="result" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Return a license</h2>
+        <form id="return-form">
+          <label>
+            Borrow ID
+            <input id="return-id" type="text" placeholder="UUID" required />
+          </label>
+          <button id="return-btn" type="submit" class="btn">Return</button>
+        </form>
+        <div id="return-result" class="result" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <h2>My Borrows</h2>
+        <div class="status-controls">
+          <input id="my-user" type="text" placeholder="e.g. alice" />
+          <button id="refresh-my-borrows" class="btn">Refresh</button>
+        </div>
+        <div id="my-borrows" class="status" style="margin-top:8px"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Status (Pool)</h2>
+        <div class="status-controls">
+          <button id="refresh-status" class="btn">Refresh</button>
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Current Borrows</h2>
+        <button id="refresh-borrows" class="btn">Refresh</button>
+        <div id="borrows" class="status" style="margin-top:8px"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Costs</h2>
+        <div class="status-controls">
+          <button id="refresh-costs" class="btn">Refresh</button>
+        </div>
+        <div id="costs" class="status" style="margin-top:8px"></div>
+        
+        <h3 style="margin-top:24px;margin-bottom:8px;font-size:16px;cursor:pointer;user-select:none;" onclick="toggleOverageCharges()">
+          <span id="overage-toggle">▶</span> Overage Charges <span style="font-size:12px;color:#666;font-weight:normal;">(click to expand)</span>
+        </h3>
+        <div id="overage-charges-list" style="margin-top:8px;display:none;"></div>
+      </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div>© 2025 Matthias Holetzko • Cloud License Server Demo</div>
+      <div><a href="/metrics" target="_blank">Metrics</a></div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+  </body>
+  </html>
+
+

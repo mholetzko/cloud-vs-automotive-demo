@@ -232,6 +232,12 @@ def root():
         return f.read()
 
 
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page():
+    with open("app/static/dashboard.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
 @app.post("/frontend-error")
 def frontend_error(err: FrontendError):
     logger.warning(

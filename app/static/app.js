@@ -1,3 +1,15 @@
+function toggleOverageCharges() {
+  const list = document.getElementById('overage-charges-list');
+  const toggle = document.getElementById('overage-toggle');
+  if (list.style.display === 'none') {
+    list.style.display = 'block';
+    toggle.textContent = '▼';
+  } else {
+    list.style.display = 'none';
+    toggle.textContent = '▶';
+  }
+}
+
 async function borrow(e) {
   e.preventDefault();
   const tool = document.getElementById('borrow-tool').value;
