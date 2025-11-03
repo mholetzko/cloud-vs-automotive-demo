@@ -14,7 +14,7 @@ html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFo
 .mb-header .mb-brand { font-size: 20px; font-weight: 600; letter-spacing: 0.5px; }
 .mb-header .mb-sub { font-size: 14px; color: #d0d0d0; }
 
-.container { max-width: 1100px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.container { max-width: none; margin: 24px 24px; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .container #app-panels { display: contents; }
 .panel { border: 1px solid var(--mb-gray-300); border-radius: 8px; padding: 16px; background: var(--mb-white); box-shadow: 0 2px 4px rgba(0,0,0,0.04); min-height: 160px; }
 
