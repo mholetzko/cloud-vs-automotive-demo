@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DevOps Loop • Mercedes-Benz Demo</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+      .flow { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+      .flow-legend { margin: 8px 0 16px 0; color: var(--mb-gray-700); }
+      .flow-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; align-items: center; }
+      .step { border: 1px solid var(--mb-gray-300); border-radius: 8px; padding: 12px; background: var(--mb-white); text-align: center; }
+      .step h3 { margin: 0 0 6px 0; font-size: 16px; }
+      .arrow { text-align: center; font-size: 18px; color: var(--mb-gray-700); }
+      .sub { font-size: 12px; color: var(--mb-gray-700); }
+      .embed-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px; }
+      .embed { border: 1px solid var(--mb-gray-300); border-radius: 8px; background: var(--mb-white); }
+      .header-nav { margin: 12px 0; }
+      .header-nav a { color: var(--mb-blue); text-decoration: none; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <header class="mb-header">
+      <div class="mb-brand">Mercedes‑Benz</div>
+      <div class="mb-sub">DevOps Loop</div>
+    </header>
+    <main class="flow">
+      <div class="header-nav"><a href="/">← Back to app</a></div>
+      <div class="panel" style="margin-top:12px">
+        <h2>Side‑by‑side journey: Automotive (edge/IoT) vs Cloud DevOps</h2>
+        <div style="border-left:4px solid var(--mb-blue); background:#f0fbff; padding:8px 12px; border-radius:6px; margin:8px 0 14px 0">
+          <b>🔑 Operational difference</b>: Many collectors/aggregators fragment insight across levels vs. <b>same telemetry for everyone</b> (L1/L2/L3 → developers)
+        </div>
+        <style>
+          .flow-visual { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px }
+          .flow-col { display:flex; flex-direction:column; gap: 8px }
+          .flow-step { border:1px solid var(--mb-gray-300); border-radius:8px; padding:12px; background:var(--mb-white); display:flex; align-items:center; gap:10px }
+          .flow-icon { font-size:28px; flex-shrink:0 }
+          .flow-desc { flex:1; font-size:13px }
+          .flow-arrow { text-align:center; color:var(--mb-gray-500); font-size:18px; margin:-4px 0 }
+          .flow-head { font-weight:600; padding:8px 12px; border-radius:8px; text-align:center; margin-bottom:4px }
+          .flow-auto { background:#fff5f5; border:2px solid #ffcdd2 }
+          .flow-cloud { background:#f0fbff; border:2px solid #b3e5fc }
+          .flow-cloud .flow-step { border-color:#81d4fa }
+          .flow-auto .flow-step { border-color:#ffb3ba }
+        </style>
+        <div class="flow-visual">
+          <div class="flow-col">
+            <div class="flow-head flow-auto">🚗 Automotive (edge/IoT)</div>
+            <div class="flow-step"><span class="flow-icon">📋</span><span class="flow-desc"><b>Ticket</b> → 1st→2nd→3rd level</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">👥</span><span class="flow-desc"><b>Many collectors</b> fragment data</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">❓</span><span class="flow-desc"><b>"Which build?"</b> Ambiguous version</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">🔀</span><span class="flow-desc"><b>Escalations</b> across teams</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">⏳</span><span class="flow-desc"><b>Long cycles</b> weeks/months</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">📝</span><span class="flow-desc"><b>Anecdotal</b> fixes</span></div>
+          </div>
+          <div class="flow-col">
+            <div class="flow-head flow-cloud">☁️ Cloud DevOps</div>
+            <div class="flow-step"><span class="flow-icon">🚨</span><span class="flow-desc"><b>Alert</b> → on‑call paged</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">📊</span><span class="flow-desc"><a href="http://localhost:3000" target="_blank"><b>Grafana</b></a> shared by all</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">🔍</span><span class="flow-desc"><a id="loki-link2" href="#" target="_blank"><b>Loki</b></a> filtered by version</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">📈</span><span class="flow-desc"><b>Metrics → code</b> mapped</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">⚡</span><span class="flow-desc"><b>CI/CD</b> minutes</span></div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step"><span class="flow-icon">📚</span><span class="flow-desc"><b>Data‑driven</b> postmortems</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <h2 style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">🧭</span> Guided Journey: from signal to cause</h2>
+        <div class="sub" style="margin:6px 0 12px 0">Jump into the running stack to correlate signals</div>
+        <ol style="margin:0 0 12px 18px">
+          <li>Generate some traffic: borrow and return a few licenses in the app homepage.</li>
+          <li>Open metrics to spot anomalies (rates, p95).</li>
+          <li>Open logs filtered to the backend and current app version.</li>
+          <li>Jump to code endpoints that produce those signals.</li>
+        </ol>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; align-items:start">
+          <div class="step">
+            <h3 style="display:flex;align-items:center;gap:6px"><span>📈</span> Grafana (Metrics)</h3>
+            <div class="sub">Dashboards and SLO signals</div>
+            <div style="margin-top:8px">
+              <a href="http://localhost:3000" target="_blank">Open Grafana</a>
+            </div>
+            <div class="sub" style="margin-top:8px">Suggested panels</div>
+            <ul style="text-align:left">
+              <li>Borrow Attempts / Success (rate)</li>
+              <li>Borrow Failures by reason</li>
+              <li>Borrow Duration p95</li>
+              <li>Pool utilization</li>
+            </ul>
+          </div>
+          <div class="step">
+            <h3 style="display:flex;align-items:center;gap:6px"><span>🧾</span> Loki (Logs)</h3>
+            <div class="sub">Query structured backend + frontend errors</div>
+            <div style="margin-top:8px">
+              <a id="loki-link" href="#" target="_blank">Open Loki Explore for current version</a>
+            </div>
+            <div class="sub" style="margin-top:8px">Useful queries</div>
+            <pre class="status" style="white-space:pre-wrap">{job="docker-logs"} |= "license-server"
+{job="docker-logs"} |= "frontend error"
+sum by () (count_over_time({job="docker-logs"} |= "borrow failed" [5m]))</pre>
+          </div>
+          <div class="step">
+            <h3 style="display:flex;align-items:center;gap:6px"><span>🧩</span> Code (API)</h3>
+            <div class="sub">Endpoints and metrics you’re seeing</div>
+            <pre class="status" style="white-space:pre-wrap"># Status pool
+GET /licenses/status  -> list of {tool,total,borrowed,available}
+
+# Borrow / Return
+POST /licenses/borrow {tool,user}
+POST /licenses/return {id}
+
+# Metrics (Prometheus scrape)
+GET /metrics  # borrow_* counters, durations, gauges</pre>
+          </div>
+        </div>
+      </div>
+      <div class="sub" style="margin-top:8px">Current App Version: <span id="app-ver">…</span> • <a href="/version" target="_blank">/version</a></div>
+      <div class="panel" style="margin-top:16px">
+        <h2>What would need to change to make edge/IoT more DevOps</h2>
+        <div class="sub" style="margin:6px 0 12px 0">Concrete steps to shrink detection→resolution at the edge</div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+          <div>
+            <h3>Instrumentation & identity</h3>
+            <ul>
+              <li>Structured logs with <b>device_id</b>, <b>app_version</b>, <b>request_id</b>.</li>
+              <li>Local metrics with labels; expose a scrape endpoint or OTLP.</li>
+              <li>Trace context propagation (span/trace IDs) across hops.</li>
+            </ul>
+            <h3>Collection & transport</h3>
+            <ul>
+              <li>On‑device collector (promtail/OTel) with buffering/back‑pressure.</li>
+              <li>Edge gateway for batching, compression, and offline tolerance.</li>
+              <li>Telemetry schema with privacy controls (PII minimization).</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Deployment & safety</h3>
+            <ul>
+              <li>OTA with staged rollouts/canaries; version as first‑class signal.</li>
+              <li>Auto‑rollback based on SLOs; health checks baked into releases.</li>
+              <li>Cohort targeting, feature flags, and remote config.</li>
+            </ul>
+            <h3>Ownership & process</h3>
+            <ul>
+              <li>On‑call ownership per product area; alerts to the team, not a queue.</li>
+              <li>Blameless postmortems; translate to tests, alerts, runbooks.</li>
+              <li>Publish an <b>observability contract</b> each service must meet.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <h2>Bridge the gap: Edge time‑series → Cloud request signals</h2>
+        <div class="sub" style="margin:6px 0 12px 0">A visual journey from high‑rate device telemetry to actionable, request‑like observability</div>
+        <style>
+          .bridge-grid { display:grid; grid-template-columns: 1fr 80px 1fr 80px 1fr; gap: 12px; align-items: stretch }
+          .b-card { border:1px solid var(--mb-gray-300); border-radius:8px; background:var(--mb-white); padding:12px }
+          .b-head { display:flex; align-items:center; gap:8px; font-weight:600; margin-bottom:6px }
+          .b-icon { font-size:20px }
+          .b-arrow { display:flex; align-items:center; justify-content:center; color:var(--mb-gray-700); font-size:22px }
+          .b-badge { display:inline-block; padding:2px 6px; border-radius:999px; border:1px solid var(--mb-gray-300); font-size:12px; margin-right:6px }
+          .b-chip { display:inline-block; padding:2px 6px; border-radius:6px; background:var(--mb-gray-100); border:1px solid var(--mb-gray-300); font-size:12px; margin:2px 6px 0 0 }
+          .code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px }
+        </style>
+        <div class="bridge-grid">
+          <div class="b-card">
+            <div class="b-head"><span class="b-icon">🚗</span><span>Edge (continuous signals)</span></div>
+            <div class="sub">High‑rate time‑series, noisy, bandwidth‑sensitive</div>
+            <div style="margin-top:6px">
+              <span class="b-badge">device_id</span>
+              <span class="b-badge">app_version</span>
+              <span class="b-badge">ts</span>
+            </div>
+            <ul style="margin:8px 0 0 18px">
+              <li>Structured logs + local metrics</li>
+              <li>Windowing (1s/10s/60s)</li>
+              <li>Sketch histograms (p95, p99)</li>
+              <li>Change‑aware reporting</li>
+            </ul>
+          </div>
+          <div class="b-arrow">→</div>
+          <div class="b-card">
+            <div class="b-head"><span class="b-icon">🛣️</span><span>Edge gateway / Collector</span></div>
+            <div class="sub">Buffer, compress, enrich, and transform</div>
+            <div style="margin-top:6px" class="code">on‑device: promtail/otlp → gateway (batching)</div>
+            <ul style="margin:8px 0 0 18px">
+              <li>Add IDs (device_id, app_version)</li>
+              <li>Aggregate windows → summaries</li>
+              <li>Back‑pressure & sampling</li>
+              <li>Privacy filters</li>
+            </ul>
+          </div>
+          <div class="b-arrow">→</div>
+          <div class="b-card">
+            <div class="b-head"><span class="b-icon">☁️</span><span>Cloud (request‑like episodes)</span></div>
+            <div class="sub">Actionable signals with IDs and exemplars</div>
+            <div style="margin-top:6px">
+              <span class="b-chip">Prometheus histograms + exemplars</span>
+              <span class="b-chip">Loki logs</span>
+              <span class="b-chip">Tempo traces</span>
+            </div>
+            <ul style="margin:8px 0 0 18px">
+              <li>Window summaries → SLOs/alerts</li>
+              <li>Link to traces/logs via IDs</li>
+              <li>Drill‑back on anomalies</li>
+              <li>Version‑aware dashboards</li>
+            </ul>
+          </div>
+        </div>
+        <div class="sub" style="margin-top:10px">Tip: Treat each window as a “synthetic request” with percentiles + counts, and attach exemplars to jump into logs/traces.</div>
+      </div>
+    </main>
+    <script>
+      (async function() {
+        try {
+          const r = await fetch('/version');
+          const data = await r.json();
+          const ver = data.version || 'dev';
+          document.getElementById('app-ver').textContent = ver;
+          const q = encodeURIComponent(`{job="docker-logs"} |= "license-server" |= "app_version=${ver}"`);
+          document.getElementById('loki-link').href = `http://localhost:3000/explore?left=["now-1h","now","Loki",{"expr":"${q}"}]`;
+          const q2 = encodeURIComponent(`{job=\"docker-logs\"} |= \"license-server\" |= \"app_version=${ver}\"`);
+          const link2 = document.getElementById('loki-link2'); if (link2) link2.href = `http://localhost:3000/explore?left=[\"now-1h\",\"now\",\"Loki\",{\"expr\":\"${q2}\"}]`;
+        } catch {}
+      })();
+    </script>
+  </body>
+  </html>
+
+

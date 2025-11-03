@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+prometheus-client
+pytest
+httpx
+passlib
+itsdangerous
+

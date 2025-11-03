@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Budget Configuration • License Server</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+      .header-nav { margin: 12px 0; }
+      .header-nav a { color: var(--mb-blue); text-decoration: none; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <header class="mb-header">
+      <div class="mb-brand">Mercedes‑Benz</div>
+      <div class="mb-sub">License Budget Configuration</div>
+    </header>
+    <main class="container">
+      <div class="header-nav"><a href="/">← Back to app</a></div>
+      <div class="panel">
+        <h2>Budget Settings</h2>
+        <div class="sub">Configure total licenses, commit (fixed budget), max overage, and pricing per tool</div>
+        <div id="config-list"></div>
+      </div>
+    </main>
+    <footer class="footer">
+      <div>© Mercedes‑Benz • Demo</div>
+    </footer>
+    <script>
+      async function loadConfig() {
+        try {
+          const r = await fetch('/config/budget');
+          const data = await r.json();
+          const out = document.getElementById('config-list');
+          out.innerHTML = '';
+          data.tools.forEach(t => {
+            const card = document.createElement('div');
+            card.style.border = '1px solid var(--mb-gray-300)';
+            card.style.borderRadius = '8px';
+            card.style.padding = '12px';
+            card.style.marginBottom = '12px';
+            card.innerHTML = `
+              <h3>${t.tool}</h3>
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap:12px; align-items:end; margin-top:8px">
+                <label>
+                  Total licenses
+                  <input type="number" id="total-${t.tool}" value="${t.total}" min="1" />
+                </label>
+                <label>
+                  Commit (fixed budget)
+                  <input type="number" id="commit-${t.tool}" value="${t.commit}" min="0" />
+                </label>
+                <label>
+                  Max overage
+                  <input type="number" id="overage-${t.tool}" value="${t.max_overage}" min="0" />
+                </label>
+                <label>
+                  Commit price ($)
+                  <input type="number" id="commit-price-${t.tool}" value="${t.commit_price || 0}" min="0" step="0.01" />
+                </label>
+                <label>
+                  Overage price/license ($)
+                  <input type="number" id="overage-price-${t.tool}" value="${t.overage_price_per_license || 0}" min="0" step="0.01" />
+                </label>
+              </div>
+              <div style="margin-top:8px">
+                <button class="btn primary" onclick="saveConfig('${t.tool}')">Save</button>
+                <span id="msg-${t.tool}" class="result" style="margin-left:8px"></span>
+              </div>
+            `;
+            out.appendChild(card);
+          });
+        } catch (e) {
+          document.getElementById('config-list').textContent = 'Unable to load configuration';
+        }
+      }
+      async function saveConfig(tool) {
+        const total = parseInt(document.getElementById(`total-${tool}`).value);
+        const commit = parseInt(document.getElementById(`commit-${tool}`).value);
+        const maxOverage = parseInt(document.getElementById(`overage-${tool}`).value);
+        const commitPrice = parseFloat(document.getElementById(`commit-price-${tool}`).value);
+        const overagePrice = parseFloat(document.getElementById(`overage-price-${tool}`).value);
+        const msg = document.getElementById(`msg-${tool}`);
+        msg.className = 'result';
+        msg.textContent = 'Saving...';
+        try {
+          const r = await fetch('/config/budget', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tool, total, commit, max_overage: maxOverage, commit_price: commitPrice, overage_price_per_license: overagePrice })
+          });
+          if (!r.ok) {
+            const err = await r.json();
+            throw new Error(err.detail || 'Save failed');
+          }
+          msg.classList.add('success');
+          msg.textContent = 'Saved';
+          setTimeout(() => { msg.textContent = ''; }, 2000);
+        } catch (e) {
+          msg.classList.add('error');
+          msg.textContent = e.message || 'Save failed';
+        }
+      }
+      loadConfig();
+    </script>
+  </body>
+</html>
+

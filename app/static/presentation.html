@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automotive vs Cloud DevOps • Mercedes-Benz</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/theme/black.css">
+  <style>
+    :root {
+      --mb-blue: #00adef;
+      --mb-silver: #c0c0c0;
+      --mb-dark: #1a1a1a;
+    }
+    .reveal {
+      background: #ffffff;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    .reveal h1, .reveal h2, .reveal h3 {
+      color: #000000;
+      text-transform: none;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+    }
+    .reveal h1 { 
+      font-size: 2.8em; 
+      margin-bottom: 0.3em;
+      font-weight: 200;
+    }
+    .reveal h2 { 
+      font-size: 1.6em; 
+      margin-bottom: 1.2em;
+      font-weight: 300;
+    }
+    .reveal h3 { 
+      font-size: 1.1em;
+      font-weight: 400;
+      margin-bottom: 0.8em;
+    }
+    .reveal p, .reveal li {
+      font-size: 0.9em;
+      line-height: 1.8;
+      color: #333;
+      font-weight: 300;
+    }
+    .reveal ul {
+      list-style: none;
+      padding: 0;
+    }
+    .reveal li {
+      padding: 0.4em 0;
+      position: relative;
+      padding-left: 1.5em;
+    }
+    .reveal li:before {
+      content: "—";
+      position: absolute;
+      left: 0;
+      color: var(--mb-blue);
+    }
+    .reveal .mb-logo {
+      font-size: 0.7em;
+      color: #000;
+      font-weight: 300;
+      letter-spacing: 0.3em;
+      margin-bottom: 3em;
+      text-transform: uppercase;
+    }
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2em;
+      margin-top: 2em;
+    }
+    .comparison-box {
+      background: #f8f8f8;
+      border-left: 3px solid var(--mb-blue);
+      padding: 1.5em;
+      text-align: left;
+    }
+    .comparison-box.automotive {
+      border-left-color: #666;
+    }
+    .comparison-box h3 {
+      font-size: 1em;
+      margin-bottom: 1em;
+      color: #000;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 400;
+    }
+    .comparison-box p {
+      font-size: 0.85em;
+      margin: 0.6em 0;
+      line-height: 1.6;
+    }
+    .flow-step {
+      background: #f8f8f8;
+      border-left: 2px solid var(--mb-blue);
+      padding: 0.8em 1em;
+      margin: 0.6em 0;
+      font-size: 0.85em;
+      font-weight: 300;
+    }
+    .flow-step.red {
+      background: #fafafa;
+      border-left-color: #666;
+    }
+    .highlight {
+      color: var(--mb-blue);
+      font-weight: 400;
+    }
+    .red-highlight {
+      color: #666;
+      font-weight: 400;
+    }
+    .reveal .controls {
+      color: var(--mb-blue);
+    }
+    .reveal .progress {
+      background: var(--mb-blue);
+    }
+    .key-difference {
+      background: #f0f9ff;
+      border-left: 3px solid var(--mb-blue);
+      padding: 1.2em 1.5em;
+      margin: 1.5em 0;
+      font-size: 0.95em;
+      font-weight: 300;
+    }
+    .tool-link {
+      display: inline-block;
+      background: #000;
+      color: white;
+      padding: 0.6em 1.5em;
+      text-decoration: none;
+      margin: 0.3em;
+      font-weight: 300;
+      font-size: 0.75em;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border: none;
+      transition: background 0.3s;
+    }
+    .tool-link:hover {
+      background: var(--mb-blue);
+      color: #000;
+    }
+    .back-link {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: var(--mb-blue);
+      text-decoration: none;
+      font-weight: 300;
+      z-index: 1000;
+      font-size: 0.9em;
+    }
+    .fragment.highlight-current-blue.visible:not(.current-fragment) {
+      opacity: 0.3;
+    }
+    .reveal ol {
+      list-style: none;
+      counter-reset: item;
+      padding: 0;
+    }
+    .reveal ol li {
+      counter-increment: item;
+      padding-left: 2.5em;
+      position: relative;
+    }
+    .reveal ol li:before {
+      content: counter(item);
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--mb-blue);
+      font-weight: 400;
+      width: 1.5em;
+      text-align: right;
+      padding-right: 0.5em;
+    }
+    .subtitle {
+      font-size: 0.9em;
+      color: #666;
+      font-weight: 300;
+      margin-top: 0.5em;
+    }
+    .section-label {
+      font-size: 0.7em;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--mb-blue);
+      margin-bottom: 1em;
+      font-weight: 400;
+    }
+  </style>
+</head>
+<body>
+  <a href="/" class="back-link">← Back to app</a>
+  
+  <div class="reveal">
+    <div class="slides">
+      
+      <!-- Slide 1: Title -->
+      <section>
+        <div class="mb-logo">Mercedes-Benz</div>
+        <h1>Automotive vs Cloud DevOps</h1>
+        <p class="subtitle">Understanding the journey from edge to observability</p>
+        <p style="font-size:0.7em; margin-top:60px; color:#999; font-weight:300">
+          Press <span class="highlight">→</span> or <span class="highlight">Space</span> to continue
+        </p>
+      </section>
+
+      <!-- Slide 2: The Problem -->
+      <section>
+        <div class="section-label">The Challenge</div>
+        <h2>Automotive Error Resolution</h2>
+        <div class="key-difference">
+          Errors travel through long, fragmented paths before reaching engineering teams
+        </div>
+        <ul>
+          <li class="fragment">Error occurs in vehicle</li>
+          <li class="fragment">Support ticket created</li>
+          <li class="fragment">Passed through 1st → 2nd → 3rd level support</li>
+          <li class="fragment">Which software? Which version? Which ECU?</li>
+          <li class="fragment">Days or weeks to triage</li>
+        </ul>
+      </section>
+
+      <!-- Slide 3: Cloud is Different -->
+      <section>
+        <div class="section-label">Cloud DevOps</div>
+        <h2>Direct Telemetry Access</h2>
+        <div class="key-difference">
+          Cloud teams have direct, immediate access to telemetry
+        </div>
+        <ul>
+          <li class="fragment">Alert fires → on-call paged</li>
+          <li class="fragment">Open dashboard → see exact failure</li>
+          <li class="fragment">Filter logs by version, user, time</li>
+          <li class="fragment">Correlate metrics → code → commit</li>
+          <li class="fragment">Minutes to triage and fix</li>
+        </ul>
+      </section>
+
+      <!-- Slide 4: Side-by-Side Comparison -->
+      <section>
+        <div class="section-label">Comparison</div>
+        <h2>Same Incident, Two Paths</h2>
+        <div class="comparison-grid">
+          <div class="comparison-box automotive">
+            <h3>Automotive (Edge/IoT)</h3>
+            <div class="flow-step red">Ticket → L1 → L2 → L3</div>
+            <div class="flow-step red">Many collectors fragment data</div>
+            <div class="flow-step red">"Which build?"</div>
+            <div class="flow-step red">Escalations across teams</div>
+            <div class="flow-step red">Weeks to fix</div>
+          </div>
+          <div class="comparison-box">
+            <h3>Cloud DevOps</h3>
+            <div class="flow-step">Alert → on-call</div>
+            <div class="flow-step"><a href="http://localhost:3000" target="_blank" style="color:#00adef">Grafana</a> shared by all</div>
+            <div class="flow-step">Loki filtered by version</div>
+            <div class="flow-step">Metrics → code mapped</div>
+            <div class="flow-step">Minutes to fix</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 5: Key Differences - Ownership -->
+      <section>
+        <div class="section-label">Key Difference</div>
+        <h2>Ownership Model</h2>
+        <div class="comparison-grid">
+          <div class="comparison-box automotive">
+            <h3>Automotive</h3>
+            <p>Tiered support model</p>
+            <p>Support funnels issues</p>
+            <p>Engineering team receives filtered, delayed reports</p>
+            <p>Weak accountability</p>
+          </div>
+          <div class="comparison-box">
+            <h3>Cloud DevOps</h3>
+            <p>Single team owns build → run</p>
+            <p>On-call rotation in the team</p>
+            <p>Same team sees alerts, fixes, deploys</p>
+            <p>Strong accountability (MTTR is KPI)</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: Key Differences - Signals -->
+      <section>
+        <div class="section-label">Key Difference</div>
+        <h2>Signal Types</h2>
+        <div class="comparison-grid">
+          <div class="comparison-box automotive">
+            <h3>Automotive (Edge/IoT)</h3>
+            <p><span class="red-highlight">Continuous time-series</span> data</p>
+            <p>Streams from sensors, CAN bus</p>
+            <p>High volume, always recording</p>
+            <p>Need aggregation before cloud</p>
+          </div>
+          <div class="comparison-box">
+            <h3>Cloud DevOps</h3>
+            <p><span class="highlight">Request-based</span> signals</p>
+            <p>Logs per request/transaction</p>
+            <p>Metrics aggregated from requests</p>
+            <p>Natural fit for telemetry stack</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: The Operational Difference -->
+      <section>
+        <div class="section-label">Critical Difference</div>
+        <h2>Operational Model</h2>
+        <div class="key-difference">
+          <p><strong>Vehicles:</strong> Many collectors & aggregators → data fragments across organizations</p>
+          <p style="margin-top:1.2em"><strong>Cloud:</strong> L1/L2/L3 exist, BUT everyone sees the <span class="highlight">same telemetry in the same tools</span></p>
+        </div>
+        <p class="fragment" style="margin-top:2em; font-size:0.95em">
+          Shared visibility enables fast, collaborative resolution
+        </p>
+      </section>
+
+      <!-- Slide 8: Bridging the Gap -->
+      <section>
+        <div class="section-label">Solution</div>
+        <h2>Bridging the Gap</h2>
+        <p class="subtitle">How to bring Cloud DevOps practices to Edge/IoT</p>
+        <ol>
+          <li class="fragment"><strong>Transform continuous → discrete:</strong> Sample, aggregate, emit events</li>
+          <li class="fragment"><strong>Observability Gateway:</strong> Edge device processes signals before cloud</li>
+          <li class="fragment"><strong>Correlation IDs:</strong> Link vehicle ID → session → error</li>
+          <li class="fragment"><strong>Unified Stack:</strong> Same Grafana/Loki/Prometheus for all</li>
+          <li class="fragment"><strong>Shared Access:</strong> Everyone sees same data, no handoffs</li>
+        </ol>
+      </section>
+
+      <!-- Slide 9: The Unified Stack -->
+      <section>
+        <div class="section-label">Observability Stack</div>
+        <h2>The Cloud Toolchain</h2>
+        <div style="text-align:left; margin:2em auto; max-width:700px">
+          <div class="flow-step">
+            <strong>Logs (Loki)</strong><br>What happened? Structured events
+          </div>
+          <div class="flow-step">
+            <strong>Metrics (Prometheus)</strong><br>How much? Time-series data
+          </div>
+          <div class="flow-step">
+            <strong>Traces (OpenTelemetry)</strong><br>Where? Request flows
+          </div>
+          <div class="flow-step">
+            <strong>Dashboards (Grafana)</strong><br>Visualize everything
+          </div>
+        </div>
+        <p class="fragment" style="margin-top:2em">
+          <a href="http://localhost:3000" target="_blank" class="tool-link">Open Grafana</a>
+          <a href="/" target="_blank" class="tool-link">Try Demo</a>
+        </p>
+      </section>
+
+      <!-- Slide 10: Speed Difference -->
+      <section>
+        <div class="section-label">Key Difference</div>
+        <h2>Speed & Certainty</h2>
+        <div class="comparison-grid">
+          <div class="comparison-box automotive">
+            <h3>Automotive</h3>
+            <p>Slow detection</p>
+            <p>Uncertain origin</p>
+            <p>Days to identify version</p>
+            <p>Manual investigation</p>
+          </div>
+          <div class="comparison-box">
+            <h3>Cloud DevOps</h3>
+            <p>Instant alerts</p>
+            <p>Exact version/build/commit</p>
+            <p>Minutes to localize</p>
+            <p>Automated correlation</p>
+          </div>
+        </div>
+        <p class="fragment" style="margin-top:2em; font-size:0.9em">
+          Versioned deploys + dashboards = <span class="highlight">failures localized to a commit</span>
+        </p>
+      </section>
+
+      <!-- Slide 11: Environment Clarity -->
+      <section>
+        <div class="section-label">Key Difference</div>
+        <h2>Environment Clarity</h2>
+        <div class="comparison-grid">
+          <div class="comparison-box automotive">
+            <h3>Automotive</h3>
+            <p>Field variability</p>
+            <p>Unclear runtime state</p>
+            <p>Manual config discovery</p>
+            <p>Hard to reproduce</p>
+          </div>
+          <div class="comparison-box">
+            <h3>Cloud DevOps</h3>
+            <p>Infrastructure as Code</p>
+            <p>Environment parity</p>
+            <p>Clear config/runtime</p>
+            <p>Easily reproducible</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: Learning Loop -->
+      <section>
+        <div class="section-label">Key Difference</div>
+        <h2>Learning & Improvement</h2>
+        <div class="comparison-grid">
+          <div class="comparison-box automotive">
+            <h3>Automotive</h3>
+            <p>Weak telemetry</p>
+            <p>Anecdotal fixes</p>
+            <p>Hard to verify impact</p>
+            <p>No error budgets</p>
+          </div>
+          <div class="comparison-box">
+            <h3>Cloud DevOps</h3>
+            <p>Rich data in postmortems</p>
+            <p>Error budgets drive decisions</p>
+            <p>Tests guard regressions</p>
+            <p>Continuous improvement</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 13: Live Demo -->
+      <section>
+        <div class="section-label">Demonstration</div>
+        <h2>License Server Demo</h2>
+        <p class="subtitle">Showcasing Cloud DevOps practices</p>
+        <div style="text-align:left; margin:2em auto; max-width:700px">
+          <div class="flow-step">
+            Borrow/Return licenses with <strong>budget tracking</strong>
+          </div>
+          <div class="flow-step">
+            Commit pricing + <strong>overage charges</strong> (accumulated)
+          </div>
+          <div class="flow-step">
+            Real-time metrics in <strong>Prometheus</strong>
+          </div>
+          <div class="flow-step">
+            Structured logs in <strong>Loki</strong>
+          </div>
+          <div class="flow-step">
+            Dashboards in <strong>Grafana</strong>
+          </div>
+        </div>
+        <p style="margin-top:2em">
+          <a href="/" class="tool-link">Launch Demo</a>
+        </p>
+      </section>
+
+      <!-- Slide 14: Summary -->
+      <section>
+        <div class="section-label">Summary</div>
+        <h2>Key Takeaways</h2>
+        <ol style="text-align:left; max-width:750px; margin:1.5em auto">
+          <li class="fragment"><strong>Ownership:</strong> Cloud teams build → run → fix (no handoffs)</li>
+          <li class="fragment"><strong>Visibility:</strong> Unified telemetry accessible to everyone</li>
+          <li class="fragment"><strong>Speed:</strong> Minutes vs weeks to triage</li>
+          <li class="fragment"><strong>Signals:</strong> Transform continuous edge data → discrete events</li>
+          <li class="fragment"><strong>Tools:</strong> Logs + Metrics + Traces = complete picture</li>
+          <li class="fragment"><strong>Learning:</strong> Data-driven postmortems & error budgets</li>
+        </ol>
+      </section>
+
+      <!-- Slide 15: Thank You -->
+      <section>
+        <div class="mb-logo">Mercedes-Benz</div>
+        <h1>Thank You</h1>
+        <p style="margin-top:3em">
+          <a href="/" class="tool-link">Back to App</a>
+          <a href="/config" class="tool-link">Budget Config</a>
+          <a href="http://localhost:3000" target="_blank" class="tool-link">Grafana</a>
+        </p>
+        <p style="font-size:0.7em; margin-top:4em; color:#999; font-weight:300">
+          Press <span class="highlight">Esc</span> for overview • <span class="highlight">F</span> for fullscreen
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      transition: 'slide',
+      backgroundTransition: 'fade',
+      controls: true,
+      progress: true,
+      center: true,
+      touch: true,
+      loop: false,
+      rtl: false,
+      navigationMode: 'default',
+      embedded: false,
+      help: true,
+      showNotes: false,
+      autoPlayMedia: null,
+      preloadIframes: null,
+      controlsTutorial: true,
+      controlsLayout: 'bottom-right',
+      controlsBackArrows: 'faded',
+      display: 'block',
+      hideInactiveCursor: true,
+      hideCursorTime: 5000,
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.2,
+      maxScale: 2.0
+    });
+  </script>
+</body>
+</html>
+
