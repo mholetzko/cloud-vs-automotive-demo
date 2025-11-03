@@ -14,3 +14,5 @@ tests/
 *.log
 .DS_Store
 
+# Grafana Cloud credentials
+prometheus-cloud.yml
