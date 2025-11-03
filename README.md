@@ -160,11 +160,24 @@ curl -L https://fly.io/install.sh | sh
 # Login to Fly.io
 flyctl auth login
 
-# Launch the app (first time)
-flyctl launch --config fly.toml
+# Create volume (first time only)
+flyctl volumes create license_data --region fra --size 1
 
-# Deploy updates
+# Deploy
 flyctl deploy
+
+# Your app will be available at:
+# https://license-server-demo.fly.dev
+```
+
+### Test the deployed instance:
+
+```bash
+# Using the demo client
+python scripts/demo_client.py --url https://license-server-demo.fly.dev
+
+# Or use curl
+curl https://license-server-demo.fly.dev/licenses/status
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions including Railway.app and DigitalOcean.
@@ -196,6 +209,23 @@ The presentation (`/presentation`) covers:
 4. **Speed & Certainty** - Minutes vs weeks to triage
 5. **Bridging the Gap** - How to bring cloud practices to edge/IoT
 
+## 🎮 Demo Client
+
+Test the license server from any machine using the included Python client:
+
+```bash
+# Against deployed instance
+python scripts/demo_client.py --url https://license-server-demo.fly.dev
+
+# Interactive mode
+python scripts/demo_client.py --url https://license-server-demo.fly.dev --interactive
+
+# Stress test
+python scripts/demo_client.py --url https://license-server-demo.fly.dev --loop 10
+```
+
+See [scripts/README.md](scripts/README.md) for full documentation.
+
 ## 📁 Project Structure
 
 ```
@@ -217,7 +247,9 @@ The presentation (`/presentation`) covers:
 │   ├── dashboards/          # Dashboard JSON files
 │   └── provisioning/        # Auto-provisioning configs
 ├── scripts/
-│   └── local_devops_demo.sh # Local CI simulation
+│   ├── local_devops_demo.sh # Local CI simulation
+│   ├── demo_client.py       # Demo client for testing
+│   └── README.md            # Client documentation
 ├── docker-compose.yml       # Full stack orchestration
 ├── Dockerfile               # App container
 ├── fly.toml                 # Fly.io deployment config
