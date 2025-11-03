@@ -16,3 +16,4 @@ tests/
 
 # Grafana Cloud credentials
 prometheus-cloud.yml
+prometheus.yml
