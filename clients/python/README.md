@@ -38,10 +38,14 @@ cd clients/python
 ```
 
 This interactive script will:
-1. Check for dependencies (requests)
-2. Install requests if needed
-3. Let you choose the target (localhost, Fly.io, custom)
-4. Run the example
+1. **Create a Python virtual environment** (`.venv/`) if it doesn't exist
+2. **Activate the virtual environment**
+3. **Install dependencies** (requests)
+4. Let you choose the target (localhost, Fly.io, custom)
+5. Run the example
+6. Clean up (deactivate venv)
+
+> **Note:** The virtual environment is isolated and won't affect your system Python packages.
 
 ### Run Example (Manual)
 

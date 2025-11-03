@@ -21,6 +21,7 @@ This will let you choose:
 - Simple, Pythonic API with context managers
 - Type hints for IDE support
 - Only requires `requests` library
+- **Automatic venv creation** (isolated environment)
 - Perfect for web apps and scripts
 - **Use case:** Flask/Django apps, data pipelines, automation
 

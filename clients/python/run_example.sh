@@ -9,19 +9,31 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIR="${SCRIPT_DIR}/.venv"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Python License Client Example${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# Check if requests is installed
-if ! python3 -c "import requests" &> /dev/null; then
-    echo -e "${YELLOW}⚠️  requests library not found${NC}"
-    echo -e "${BLUE}Installing requests...${NC}"
-    pip3 install requests
+# Create virtual environment if it doesn't exist
+if [ ! -d "${VENV_DIR}" ]; then
+    echo -e "${BLUE}📦 Creating Python virtual environment...${NC}"
+    python3 -m venv "${VENV_DIR}"
+    echo -e "${GREEN}✅ Virtual environment created${NC}"
     echo ""
 fi
+
+# Activate virtual environment
+echo -e "${BLUE}🔧 Activating virtual environment...${NC}"
+source "${VENV_DIR}/bin/activate"
+
+# Install/upgrade dependencies
+echo -e "${BLUE}📥 Installing dependencies...${NC}"
+pip install -q --upgrade pip
+pip install -q -r requirements.txt
+echo -e "${GREEN}✅ Dependencies installed${NC}"
+echo ""
 
 # Select deployment target
 echo -e "${BLUE}Select deployment target:${NC}"
@@ -75,4 +87,7 @@ else
     echo "  Server:      ${SERVER_URL}"
 fi
 echo ""
+
+# Deactivate virtual environment
+deactivate
 
