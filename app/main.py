@@ -246,10 +246,11 @@ def frontend_error(err: FrontendError):
     return {"status": "ok"}
 
 
-@app.get("/overview", response_class=HTMLResponse)
-def overview_page():
-    with open("app/static/overview.html", "r", encoding="utf-8") as f:
-        return f.read()
+# DevOps Overview page removed - now integrated into presentation
+# @app.get("/overview", response_class=HTMLResponse)
+# def overview_page():
+#     with open("app/static/overview.html", "r", encoding="utf-8") as f:
+#         return f.read()
 
 
 @app.get("/presentation", response_class=HTMLResponse)
