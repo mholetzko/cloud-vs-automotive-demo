@@ -1,5 +1,20 @@
 # Demo Client Scripts
 
+## Quick Start
+
+Use the launcher script for an easy interactive experience:
+
+```bash
+./scripts/launch_client.sh
+```
+
+The launcher will:
+1. Check Python installation
+2. Install dependencies if needed
+3. Let you choose target (localhost/Fly.io/custom)
+4. Let you choose mode (interactive/simulation/stress test)
+5. Run the client
+
 ## License Server Demo Client
 
 A Python client to test the license server from any machine, against either localhost or the deployed Fly.io instance.
