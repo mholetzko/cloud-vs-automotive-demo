@@ -26,11 +26,17 @@ logger = logging.getLogger("license-server")
 
 
 # Prometheus metrics
-borrow_attempts = Counter("license_borrow_attempts_total", "Total borrow attempts", ["tool"]) 
-borrow_successes = Counter("license_borrow_success_total", "Total successful borrows", ["tool"]) 
+borrow_attempts = Counter("license_borrow_attempts_total", "Total borrow attempts", ["tool", "user"]) 
+borrow_successes = Counter("license_borrow_success_total", "Total successful borrows", ["tool", "user"]) 
 borrow_failures = Counter("license_borrow_failure_total", "Total failed borrow attempts", ["tool", "reason"]) 
 borrow_duration = Histogram("license_borrow_duration_seconds", "Borrow operation duration", ["tool"]) 
 borrowed_gauge = Gauge("licenses_borrowed", "Currently borrowed licenses per tool", ["tool"]) 
+total_licenses_gauge = Gauge("licenses_total", "Total licenses available per tool", ["tool"])
+overage_gauge = Gauge("licenses_overage", "Current overage count per tool", ["tool"])
+commit_gauge = Gauge("licenses_commit", "Commit quantity per tool", ["tool"])
+max_overage_gauge = Gauge("licenses_max_overage", "Max overage allowed per tool", ["tool"])
+at_max_overage_gauge = Gauge("licenses_at_max_overage", "Whether tool is at max overage (1) or not (0)", ["tool"])
+overage_checkouts = Counter("license_overage_checkouts_total", "Total overage checkouts", ["tool", "user"]) 
 
 
 class BorrowRequest(BaseModel):
@@ -105,7 +111,7 @@ def startup_event() -> None:
 @app.post("/licenses/borrow", response_model=BorrowResponse)
 def borrow(req: BorrowRequest):
     start = time.perf_counter()
-    borrow_attempts.labels(req.tool).inc()
+    borrow_attempts.labels(req.tool, req.user).inc()
     borrow_id = str(uuid.uuid4())
     borrowed_at = datetime.now(timezone.utc).isoformat()
     ok, is_overage = borrow_license(req.tool, req.user, borrow_id, borrowed_at)
@@ -124,11 +130,21 @@ def borrow(req: BorrowRequest):
         borrow_failures.labels(req.tool, reason).inc()
         logger.warning("borrow failed tool=%s user=%s reason=%s", req.tool, req.user, reason)
         raise HTTPException(status_code=409, detail=f"No licenses available for {req.tool}")
-    # update gauge
+    # update gauges
     status = get_status(req.tool)
     if status:
-        borrowed_gauge.labels(req.tool).set(status["borrowed"]) 
-    borrow_successes.labels(req.tool).inc()
+        borrowed_gauge.labels(req.tool).set(status["borrowed"])
+        total_licenses_gauge.labels(req.tool).set(status["total"])
+        overage_gauge.labels(req.tool).set(status["overage"])
+        commit_gauge.labels(req.tool).set(status["commit"])
+        max_overage_gauge.labels(req.tool).set(status["max_overage"])
+        at_max_overage_gauge.labels(req.tool).set(1 if status["overage"] >= status["max_overage"] else 0)
+    borrow_successes.labels(req.tool, req.user).inc()
+    
+    # Track overage checkouts
+    if is_overage:
+        overage_checkouts.labels(req.tool, req.user).inc()
+    
     overage_str = " (overage)" if is_overage else ""
     logger.info("borrow success tool=%s user=%s id=%s borrowed=%d/%d%s", req.tool, req.user, borrow_id, status["borrowed"], status["total"] if status else -1, overage_str)
     return BorrowResponse(id=borrow_id, tool=req.tool, user=req.user, borrowed_at=borrowed_at)
@@ -142,7 +158,12 @@ def return_(req: ReturnRequest) -> Dict[str, str]:
         raise HTTPException(status_code=404, detail="Borrow record not found")
     status = get_status(tool)
     if status:
-        borrowed_gauge.labels(tool).set(status["borrowed"]) 
+        borrowed_gauge.labels(tool).set(status["borrowed"])
+        total_licenses_gauge.labels(tool).set(status["total"])
+        overage_gauge.labels(tool).set(status["overage"])
+        commit_gauge.labels(tool).set(status["commit"])
+        max_overage_gauge.labels(tool).set(status["max_overage"])
+        at_max_overage_gauge.labels(tool).set(1 if status["overage"] >= status["max_overage"] else 0)
     logger.info("return success id=%s tool=%s borrowed=%d/%d", req.id, tool, status["borrowed"] if status else -1, status["total"] if status else -1)
     return {"status": "ok", "tool": tool}
 
