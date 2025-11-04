@@ -9,3 +9,9 @@ venv/
 
 # OS
 .DS_Store
+clients/c/example.o
+clients/c/license_client_example
+clients/c/license_client.o
+clients/cpp/example.o
+clients/cpp/license_client_example
+clients/cpp/license_client.o
