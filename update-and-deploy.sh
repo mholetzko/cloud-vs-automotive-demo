@@ -35,7 +35,7 @@ echo -e "${GREEN}✓ Pushed to GitHub${NC}"
 echo ""
 
 echo -e "${BLUE}3️⃣  GitHub Actions will deploy automatically${NC}"
-echo -e "${YELLOW}   → Watch: https://github.com/mholetzko/cloud-vs-automotive-demo/actions${NC}"
+echo -e "${YELLOW}   → Watch: https://github.com/mholetzko/permetix/actions${NC}"
 echo ""
 
 read -p "Wait for deployment to complete, then press Enter to continue..."

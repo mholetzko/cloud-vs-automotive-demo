@@ -255,7 +255,7 @@ You now have a **professional, production-ready, real-time observability dashboa
 - **Real-Time Dashboard (local):** http://localhost:8000/realtime
 - **Real-Time Dashboard (prod):** https://license-server-demo.fly.dev/realtime
 - **Grafana Cloud:** https://mholetzko.grafana.net
-- **GitHub:** https://github.com/mholetzko/cloud-vs-automotive-demo
+- **GitHub:** https://github.com/mholetzko/permetix
 
 ---
 

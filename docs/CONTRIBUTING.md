@@ -60,7 +60,7 @@ git push origin feature/your-feature-name
 
 ### 5. Create Pull Request
 
-1. Go to [GitHub repository](https://github.com/mholetzko/cloud-vs-automotive-demo)
+1. Go to [GitHub repository](https://github.com/mholetzko/permetix)
 2. Click "Pull requests" → "New pull request"
 3. Select your branch
 4. Fill out the PR template
@@ -177,7 +177,7 @@ pytest -m "not slow" -v
 
 ```bash
 # Clone and setup
-git clone https://github.com/mholetzko/cloud-vs-automotive-demo.git
+git clone https://github.com/mholetzko/permetix.git
 cd cloud-vs-automotive-demo
 
 # Create virtual environment

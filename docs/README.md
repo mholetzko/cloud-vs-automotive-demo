@@ -1,6 +1,6 @@
 # Cloud vs Automotive DevOps Demo
 
-[![GitHub Repository](https://img.shields.io/badge/GitHub-cloud--vs--automotive--demo-blue?logo=github)](https://github.com/mholetzko/cloud-vs-automotive-demo)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-permetix-blue?logo=github)](https://github.com/mholetzko/permetix)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 An interactive demonstration showcasing the differences between Automotive (Edge/IoT) and Cloud DevOps observability practices, featuring a license server with a complete observability stack.
@@ -46,7 +46,7 @@ This demo is designed for automotive companies to understand how cloud DevOps lo
 
 ```bash
 # Clone the repository
-git clone https://github.com/mholetzko/cloud-vs-automotive-demo.git
+git clone https://github.com/mholetzko/permetix.git
 cd cloud-vs-automotive-demo
 
 # Start the full stack

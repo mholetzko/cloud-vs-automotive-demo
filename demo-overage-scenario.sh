@@ -391,7 +391,7 @@ echo -e "${GREEN}🌐 Links:${NC}"
 echo "  Dashboard:     https://license-server-demo.fly.dev/dashboard"
 echo "  Grafana:       https://mholetzko.grafana.net"
 echo "  Presentation:  https://license-server-demo.fly.dev/presentation"
-echo "  GitHub:        https://github.com/mholetzko/cloud-vs-automotive-demo"
+echo "  GitHub:        https://github.com/mholetzko/permetix"
 echo ""
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"

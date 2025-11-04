@@ -290,7 +290,7 @@ sqlite3 /data/licenses.db ".tables"
 
 ## 📞 Support & Resources
 
-- **Repository:** https://github.com/mholetzko/cloud-vs-automotive-demo
+- **Repository:** https://github.com/mholetzko/permetix
 - **Fly.io Dashboard:** https://fly.io/apps/license-server-demo
 - **Deployment Docs:** See `DEPLOYMENT.md`
 - **Dashboard Docs:** See `grafana/DASHBOARDS.md`

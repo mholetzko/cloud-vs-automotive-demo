@@ -107,7 +107,7 @@ git commit -m "Add automotive software products"
 git push origin main
 
 # 2. Wait for GitHub Actions to complete (~2-3 minutes)
-# Check: https://github.com/mholetzko/cloud-vs-automotive-demo/actions
+# Check: https://github.com/mholetzko/permetix/actions
 
 # 3. Reset the database with new products
 ./reset-flyio-db.sh
