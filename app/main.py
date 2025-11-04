@@ -54,6 +54,10 @@ class RealtimeMetricsBuffer:
         self.returns = deque(maxlen=100000)
         self.failures = deque(maxlen=10000)
         
+        # Per-tool aggregated metrics (for charting)
+        # Structure: { tool_name: deque([(timestamp, borrow_count, users_list)]) }
+        self.tool_metrics = {}
+        
     def add_borrow(self, tool: str, user: str, is_overage: bool, borrow_id: str):
         """Record a borrow event"""
         event = {
@@ -134,6 +138,64 @@ class RealtimeMetricsBuffer:
             "retention_hours": REALTIME_RETENTION_HOURS,
             "oldest_event": self.borrows[0]["timestamp"] if self.borrows else None
         }
+    
+    def aggregate_tool_metrics(self, window_seconds: int = 60):
+        """Aggregate borrow events into per-tool, per-minute data points for charting
+        
+        This creates time-series data that persists when users switch tool views.
+        Aggregates events into 1-minute buckets.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
+        cutoff_iso = cutoff.isoformat()
+        
+        # Get recent borrows within window
+        recent_borrows = [e for e in self.borrows if e["timestamp"] >= cutoff_iso]
+        
+        # Group by tool and minute
+        tool_data = {}
+        for event in recent_borrows:
+            tool = event["tool"]
+            if tool not in tool_data:
+                tool_data[tool] = {}
+            
+            # Round timestamp to minute
+            event_time = datetime.fromisoformat(event["timestamp"])
+            minute_key = event_time.replace(second=0, microsecond=0).isoformat()
+            
+            if minute_key not in tool_data[tool]:
+                tool_data[tool][minute_key] = {
+                    "count": 0,
+                    "users": set(),
+                    "overage_count": 0
+                }
+            
+            tool_data[tool][minute_key]["count"] += 1
+            tool_data[tool][minute_key]["users"].add(event["user"])
+            if event.get("is_overage"):
+                tool_data[tool][minute_key]["overage_count"] += 1
+        
+        # Convert to sorted list format
+        result = {}
+        for tool, minutes in tool_data.items():
+            result[tool] = [
+                {
+                    "timestamp": ts,
+                    "count": data["count"],
+                    "users": list(data["users"]),
+                    "overage_count": data["overage_count"]
+                }
+                for ts, data in sorted(minutes.items())
+            ]
+        
+        return result
+    
+    def get_tool_history(self, tool: str, window_seconds: int = 1800):
+        """Get aggregated history for a specific tool
+        
+        Returns time-series data suitable for charting
+        """
+        all_metrics = self.aggregate_tool_metrics(window_seconds)
+        return all_metrics.get(tool, [])
 
 # Global instance
 realtime_buffer = RealtimeMetricsBuffer()
@@ -396,6 +458,10 @@ async def realtime_stream(request: Request):
                 overage_borrows = sum(1 for b in recent_60s["borrows"] if b.get("is_overage"))
                 overage_rate = (overage_borrows / total_borrows * 100) if total_borrows > 0 else 0
                 
+                # Get per-tool aggregated metrics (for persistent charts)
+                # This is the key: server maintains history per tool
+                tool_metrics = realtime_buffer.aggregate_tool_metrics(window_seconds=REALTIME_RETENTION_SECONDS)
+                
                 # Build event data
                 data = {
                     "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -411,7 +477,8 @@ async def realtime_stream(request: Request):
                         "returns": recent_60s["returns"][-10:],
                         "failures": recent_60s["failures"][-10:]
                     },
-                    "buffer_stats": realtime_buffer.get_stats_summary()
+                    "buffer_stats": realtime_buffer.get_stats_summary(),
+                    "tool_metrics": tool_metrics  # Add per-tool time-series data
                 }
                 
                 # Send as SSE

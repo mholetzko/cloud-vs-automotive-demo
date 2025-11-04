@@ -237,6 +237,10 @@ let lastOverageRate = 0;
 let selectedTool = 'all'; // Current tool filter
 let allTools = []; // List of all available tools
 
+// Server-side tool metrics are now buffered on the backend
+// We just need to track which tool is selected
+let toolMetricsCache = null; // Will store the latest tool_metrics from SSE
+
 // Time range selector
 const timeRangeSelector = document.getElementById('time-range');
 timeRangeSelector.addEventListener('change', (e) => {
@@ -248,13 +252,18 @@ timeRangeSelector.addEventListener('change', (e) => {
   document.getElementById('borrow-chart-title').textContent = `License Borrows (Last ${label})`;
   document.getElementById('overage-chart-title').textContent = `Overage Checkouts (Last ${label})`;
   
-  // Clear charts to start fresh with new range
+  // Clear overview charts
   borrowRateChart.data.labels = [];
   borrowRateChart.data.datasets[0].data = [];
   overageChart.data.labels = [];
   overageChart.data.datasets[0].data = [];
   borrowRateChart.update();
   overageChart.update();
+  
+  // If a tool is selected, it will reload from server-side buffer on next SSE event
+  if (selectedTool !== 'all' && toolMetricsCache) {
+    updateToolSpecificCharts(selectedTool, toolMetricsCache);
+  }
   
   console.log(`Time range changed to: ${label} (${newRange} seconds)`);
 });
@@ -280,10 +289,13 @@ toolFilterSelector.addEventListener('change', (e) => {
     document.getElementById('overview-charts').style.display = 'none';
     document.getElementById('tool-specific-charts').style.display = 'block';
     
-    // Clear tool-specific charts
-    toolBorrowChart.data.labels = [];
-    toolBorrowChart.data.datasets[0].data = [];
-    toolBorrowChart.data.datasets[0].metadata = [];
+    // Load buffered data for this tool
+    const toolData = chartDataBuffer.getToolData(selectedTool);
+    toolBorrowChart.data.labels = [...toolData.timestamps];
+    toolBorrowChart.data.datasets[0].data = [...toolData.borrows];
+    toolBorrowChart.data.datasets[0].metadata = [...toolData.metadata];
+    
+    // Clear other charts (will be populated by next SSE update)
     toolUserChart.data.labels = [];
     toolUserChart.data.datasets[0].data = [];
     toolCommitChart.data.datasets[0].data = [0, 0, 0];
@@ -291,6 +303,8 @@ toolFilterSelector.addEventListener('change', (e) => {
     toolBorrowChart.update();
     toolUserChart.update();
     toolCommitChart.update();
+    
+    console.log(`Loaded ${toolData.timestamps.length} buffered data points for ${selectedTool}`);
   }
   
   console.log(`Tool filter changed to: ${selectedTool}`);
@@ -322,110 +336,93 @@ function updateToolSelector(tools) {
   }
 }
 
-function updateToolSpecificCharts(data) {
-  if (selectedTool === 'all') return;
+function updateToolSpecificCharts(tool, toolMetrics) {
+  if (tool === 'all') return;
   
-  // Find the selected tool
-  const toolData = data.tools.find(t => t.tool === selectedTool);
-  if (!toolData) return;
+  // Get the tool's buffered metrics from server
+  const toolHistory = toolMetrics[tool] || [];
   
-  // Update tool info
-  document.getElementById('tool-info').textContent = 
-    `${toolData.borrowed}/${toolData.total} in use (${toolData.in_commit} commit, ${toolData.overage} overage)`;
+  // Filter based on current window size
+  const cutoff = new Date(Date.now() - WINDOW_SIZE * 1000);
+  const filteredHistory = toolHistory.filter(point => {
+    const pointTime = new Date(point.timestamp);
+    return pointTime >= cutoff;
+  });
   
   // Update borrow chart with user annotations
-  const toolBorrows = data.recent_events.borrows.filter(b => b.tool === selectedTool);
-  if (toolBorrows.length > 0) {
-    const now = new Date();
-    const label = now.toLocaleTimeString();
+  toolBorrowChart.data.labels = filteredHistory.map(point => {
+    const time = new Date(point.timestamp);
+    return time.toLocaleTimeString();
+  });
+  toolBorrowChart.data.datasets[0].data = filteredHistory.map(point => point.count);
+  
+  // Store metadata for tooltip
+  toolBorrowChart.data.datasets[0].metadata = filteredHistory.map(point => ({
+    users: point.users,
+    count: point.count
+  }));
+  
+  toolBorrowChart.update('none');
+  
+  // Fetch current tool status and borrows for other charts
+  Promise.all([
+    fetch(`/status/${encodeURIComponent(tool)}`).then(res => res.json()),
+    fetch(`/borrows?user=all`).then(res => res.json())
+  ]).then(([toolStatus, allBorrows]) => {
+    // Update tool info
+    document.getElementById('tool-info').textContent = 
+      `${toolStatus.borrowed}/${toolStatus.total} in use (${toolStatus.in_commit} commit, ${toolStatus.overage} overage)`;
     
-    toolBorrowChart.data.labels.push(label);
-    toolBorrowChart.data.datasets[0].data.push(toolBorrows.length);
-    
-    // Store metadata for tooltip
-    if (!toolBorrowChart.data.datasets[0].metadata) {
-      toolBorrowChart.data.datasets[0].metadata = [];
-    }
-    toolBorrowChart.data.datasets[0].metadata.push({
-      users: toolBorrows.map(b => b.user),
-      count: toolBorrows.length
+    // Update user distribution (from current borrows)
+    const toolBorrows = allBorrows.filter(b => b.tool === tool);
+    const userCounts = {};
+    toolBorrows.forEach(b => {
+      userCounts[b.user] = (userCounts[b.user] || 0) + 1;
     });
     
-    // Keep only last WINDOW_SIZE points
-    const maxPoints = Math.floor(WINDOW_SIZE / 60); // One point per minute
-    if (toolBorrowChart.data.labels.length > maxPoints) {
-      toolBorrowChart.data.labels.shift();
-      toolBorrowChart.data.datasets[0].data.shift();
-      toolBorrowChart.data.datasets[0].metadata.shift();
-    }
+    toolUserChart.data.labels = Object.keys(userCounts);
+    toolUserChart.data.datasets[0].data = Object.values(userCounts);
+    toolUserChart.update('none');
     
-    toolBorrowChart.update('none');
-  }
-  
-  // Update user distribution (from current borrows)
-  fetch(`/borrows?user=all`)
-    .then(res => res.json())
-    .then(borrows => {
-      const toolBorrows = borrows.filter(b => b.tool === selectedTool);
-      const userCounts = {};
-      toolBorrows.forEach(b => {
-        userCounts[b.user] = (userCounts[b.user] || 0) + 1;
-      });
-      
-      toolUserChart.data.labels = Object.keys(userCounts);
-      toolUserChart.data.datasets[0].data = Object.values(userCounts);
-      toolUserChart.update('none');
-    })
-    .catch(err => console.error('Error fetching borrows:', err));
-  
-  // Update commit vs overage chart
-  const inCommit = Math.min(toolData.borrowed, toolData.commit);
-  const inOverage = toolData.overage;
-  const available = toolData.available;
-  
-  toolCommitChart.data.datasets[0].data = [inCommit, inOverage, available];
-  toolCommitChart.update('none');
-  
-  // Update recent events table
-  const recentToolEvents = [
-    ...toolBorrows.map(b => ({
-      time: new Date(b.timestamp).toLocaleTimeString(),
-      event: 'Borrow',
-      user: b.user,
-      type: b.is_overage ? 'Overage' : 'Commit'
-    })),
-    ...data.recent_events.returns
-      .filter(r => {
-        // Match returns by checking if any borrow from this tool matches the ID
-        return toolBorrows.some(b => b.id === r.id);
-      })
-      .map(r => ({
-        time: new Date(r.timestamp).toLocaleTimeString(),
-        event: 'Return',
-        user: r.user || 'Unknown',
-        type: '-'
-      }))
-  ].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 20);
-  
-  const tbody = document.getElementById('events-tbody');
-  if (recentToolEvents.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">No recent activity</td></tr>';
-  } else {
-    tbody.innerHTML = recentToolEvents.map(event => `
-      <tr style="border-bottom: 1px solid #f0f0f0;">
-        <td style="padding: 8px;">${event.time}</td>
-        <td style="padding: 8px;">
-          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${event.event === 'Borrow' ? '#00adef' : '#4caf50'}; margin-right: 6px;"></span>
-          ${event.event}
-        </td>
-        <td style="padding: 8px;">${event.user}</td>
-        <td style="padding: 8px;">
-          ${event.type === 'Overage' ? '<span style="color: #f57c00; font-weight: 500;">Overage</span>' : 
-            event.type === 'Commit' ? '<span style="color: #00adef;">Commit</span>' : '-'}
-        </td>
-      </tr>
-    `).join('');
-  }
+    // Update commit vs overage chart
+    const inCommit = Math.min(toolStatus.borrowed, toolStatus.commit);
+    const inOverage = toolStatus.overage;
+    const available = toolStatus.available;
+    
+    toolCommitChart.data.datasets[0].data = [inCommit, inOverage, available];
+    toolCommitChart.update('none');
+    
+    // Update recent events table from historical data
+    const recentToolEvents = toolHistory
+      .slice(-20) // Last 20 time points
+      .reverse()
+      .map(point => ({
+        time: new Date(point.timestamp).toLocaleTimeString(),
+        event: 'Activity',
+        user: point.users.join(', '),
+        type: point.overage_count > 0 ? `${point.overage_count} Overage` : 'Commit'
+      }));
+    
+    const tbody = document.getElementById('events-tbody');
+    if (recentToolEvents.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">No recent activity</td></tr>';
+    } else {
+      tbody.innerHTML = recentToolEvents.map(event => `
+        <tr style="border-bottom: 1px solid #f0f0f0;">
+          <td style="padding: 8px;">${event.time}</td>
+          <td style="padding: 8px;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #00adef; margin-right: 6px;"></span>
+            ${event.event}
+          </td>
+          <td style="padding: 8px;">${event.user}</td>
+          <td style="padding: 8px;">
+            ${event.type.includes('Overage') ? `<span style="color: #f57c00; font-weight: 500;">${event.type}</span>` : 
+              `<span style="color: #00adef;">${event.type}</span>`}
+          </td>
+        </tr>
+      `).join('');
+    }
+  }).catch(err => console.error('Error updating tool-specific charts:', err));
 }
 
 // Connect to SSE stream
@@ -469,6 +466,12 @@ function connectSSE() {
   eventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      
+      // Cache the tool metrics from server (includes all historical data)
+      if (data.tool_metrics) {
+        toolMetricsCache = data.tool_metrics;
+      }
+      
       updateDashboard(data);
     } catch (error) {
       console.error('Error parsing SSE data:', error);
@@ -505,8 +508,10 @@ function updateDashboard(data) {
     updateOverageChart(data.recent_events.borrows);
     updateUtilizationChart(data.tools);
   } else {
-    // Update tool-specific charts
-    updateToolSpecificCharts(data);
+    // Update tool-specific charts with server-buffered data
+    if (toolMetricsCache) {
+      updateToolSpecificCharts(selectedTool, toolMetricsCache);
+    }
   }
 }
 
