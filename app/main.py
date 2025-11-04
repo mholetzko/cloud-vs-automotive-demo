@@ -256,6 +256,10 @@ class BudgetConfigRequest(BaseModel):
     max_overage: int = Field(..., ge=0)
     commit_price: float = Field(..., ge=0.0)
     overage_price_per_license: float = Field(..., ge=0.0)
+class SpendProtectionRequest(BaseModel):
+    tool: str
+    max_spend: Optional[float] = Field(None, ge=0.0)
+
 
 
 class AddCustomerRequest(BaseModel):
@@ -330,6 +334,25 @@ def borrow(req: BorrowRequest, request: Request):
     borrow_attempts.labels(req.tool, req.user).inc()
     borrow_id = str(uuid.uuid4())
     borrowed_at = datetime.now(timezone.utc).isoformat()
+    # Enforce spend protection before attempting overage borrows
+    # Check current status
+    status_snapshot = get_status(req.tool)
+    if status_snapshot:
+        borrowed_now = int(status_snapshot["borrowed"])
+        commit_now = int(status_snapshot["commit"])
+        overage_now = max(borrowed_now - commit_now, 0)
+        will_be_overage = borrowed_now >= commit_now
+        if will_be_overage:
+            from .db import get_customer_max_spend, get_month_to_date_overage_cost
+            max_spend = get_customer_max_spend(req.tool)
+            if max_spend is not None:
+                current_cost = get_month_to_date_overage_cost(req.tool)
+                # Estimated next overage cost
+                next_cost = float(status_snapshot.get("overage_price_per_license", 0.0))
+                if current_cost + next_cost > max_spend:
+                    logger.warning("borrow blocked by max spend tool=%s user=%s cost=%.2f next=%.2f cap=%.2f", req.tool, req.user, current_cost, next_cost, max_spend)
+                    raise HTTPException(status_code=403, detail="Customer max spend reached for this period")
+
     ok, is_overage = borrow_license(req.tool, req.user, borrow_id, borrowed_at)
     duration = time.perf_counter() - start
     borrow_duration.labels(req.tool).observe(duration)
@@ -633,6 +656,16 @@ def update_budget(req: BudgetConfigRequest):
     
     logger.info("customer budget restricted tool=%s total=%d commit=%d max_overage=%d", req.tool, req.total, req.commit, req.max_overage)
     return {"status": "ok", "tool": req.tool}
+
+
+@app.put("/config/protection")
+def update_spend_protection(req: SpendProtectionRequest):
+    """Update customer max spend protection for a tool"""
+    from .db import set_customer_max_spend
+    if not set_customer_max_spend(req.tool, req.max_spend):
+        raise HTTPException(status_code=400, detail="Tool not found")
+    logger.info("customer max spend updated tool=%s max_spend=%s", req.tool, str(req.max_spend))
+    return {"status": "ok", "tool": req.tool, "max_spend": req.max_spend}
 
 
 @app.put("/api/vendor/budget")

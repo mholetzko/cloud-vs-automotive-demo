@@ -770,6 +770,8 @@ def _ensure_vendor_customer_columns(conn) -> None:
         to_add.append("ALTER TABLE licenses ADD COLUMN customer_commit_qty INTEGER")
     if "customer_max_overage" not in cols:
         to_add.append("ALTER TABLE licenses ADD COLUMN customer_max_overage INTEGER")
+    if "customer_max_spend" not in cols:
+        to_add.append("ALTER TABLE licenses ADD COLUMN customer_max_spend REAL")
     for stmt in to_add:
         cur.execute(stmt)
     if to_add:
@@ -943,6 +945,7 @@ def get_budget_config(tool: str) -> Optional[dict]:
             SELECT tool, total, commit_qty, max_overage, borrowed,
                    vendor_total, vendor_commit_qty, vendor_max_overage,
                    customer_total, customer_commit_qty, customer_max_overage,
+                   customer_max_spend,
                    commit_price, overage_price_per_license
             FROM licenses
             WHERE tool = ?
@@ -967,5 +970,50 @@ def get_budget_config(tool: str) -> Optional[dict]:
             "active_max_overage": row["max_overage"],
             "borrowed": row["borrowed"],
             "commit_price": row["commit_price"],
-            "overage_price_per_license": row["overage_price_per_license"]
+            "overage_price_per_license": row["overage_price_per_license"],
+            "customer_max_spend": row.get("customer_max_spend") if isinstance(row, dict) else row["customer_max_spend"]
         }
+
+
+def set_customer_max_spend(tool: str, amount: float | None) -> bool:
+    """Set the customer's max spend protection for a tool (per current period)."""
+    with get_connection(False) as conn:
+        _ensure_vendor_customer_columns(conn)
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE licenses SET customer_max_spend = ? WHERE tool = ?",
+            (amount, tool)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def get_customer_max_spend(tool: str) -> float | None:
+    with get_connection(True) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT customer_max_spend FROM licenses WHERE tool = ?", (tool,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return row[0] if isinstance(row, tuple) else row["customer_max_spend"]
+
+
+def get_month_to_date_overage_cost(tool: str) -> float:
+    """Approximate month-to-date overage cost using current overage price and count of overage borrows this month."""
+    from datetime import datetime
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    with get_connection(True) as conn:
+        cur = conn.cursor()
+        # Count overage charges this month
+        try:
+            cur.execute("SELECT COUNT(*) as cnt FROM overage_charges WHERE tool = ? AND created_at >= ?", (tool, month_start))
+            cnt = int(cur.fetchone()[0])
+        except Exception:
+            cur.execute("SELECT COUNT(*) as cnt FROM overage_charges WHERE tool = ?", (tool,))
+            cnt = int(cur.fetchone()[0])
+        # Get current overage price
+        cur.execute("SELECT overage_price_per_license FROM licenses WHERE tool = ?", (tool,))
+        price_row = cur.fetchone()
+        price = float(price_row[0]) if isinstance(price_row, tuple) else float(price_row["overage_price_per_license"])
+        return cnt * price

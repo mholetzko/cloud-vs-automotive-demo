@@ -125,8 +125,8 @@
     </header>
     <main class="config-container">
       <div class="config-header">
-        <h1>Budget Configuration</h1>
-        <p>Configure total licenses, commit budgets, max overage limits, and pricing per tool</p>
+        <h1>Customer Protection</h1>
+        <p>Set your maximum spend protection. All other budgets are managed by your vendor.</p>
       </div>
       <div style="max-width: 1400px; margin: 0 auto 30px auto; padding: 20px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px;">
         <p style="margin: 0; font-size: 1rem; color: #856404;">
@@ -173,28 +173,12 @@
               <h3>${t.tool}</h3>
               <div class="config-form">
                 <div class="config-field">
-                  <label>Total Licenses</label>
-                  <input type="number" id="total-${t.tool}" value="${t.total}" min="1" />
-                </div>
-                <div class="config-field">
-                  <label>Commit Budget</label>
-                  <input type="number" id="commit-${t.tool}" value="${t.commit}" min="0" />
-                </div>
-                <div class="config-field">
-                  <label>Max Overage</label>
-                  <input type="number" id="overage-${t.tool}" value="${t.max_overage}" min="0" />
-                </div>
-                <div class="config-field">
-                  <label>Commit Price ($)</label>
-                  <input type="number" id="commit-price-${t.tool}" value="${t.commit_price || 0}" min="0" step="0.01" />
-                </div>
-                <div class="config-field">
-                  <label>Overage Price ($)</label>
-                  <input type="number" id="overage-price-${t.tool}" value="${t.overage_price_per_license || 0}" min="0" step="0.01" />
+                  <label>Max Spend ($)</label>
+                  <input type="number" id="max-spend-${t.tool}" value="${t.customer_max_spend ?? ''}" min="0" step="0.01" placeholder="e.g., 5000" />
                 </div>
               </div>
               <div class="config-actions">
-                <button class="btn-save" onclick="saveConfig('${t.tool}')">Save Changes</button>
+                <button class="btn-save" onclick="saveProtection('${t.tool}')">Save Protection</button>
                 <span id="msg-${t.tool}" class="message" style="display:none"></span>
               </div>
             `;
@@ -204,27 +188,24 @@
           document.getElementById('config-list').textContent = 'Unable to load configuration';
         }
       }
-      async function saveConfig(tool) {
-        const total = parseInt(document.getElementById(`total-${tool}`).value);
-        const commit = parseInt(document.getElementById(`commit-${tool}`).value);
-        const maxOverage = parseInt(document.getElementById(`overage-${tool}`).value);
-        const commitPrice = parseFloat(document.getElementById(`commit-price-${tool}`).value);
-        const overagePrice = parseFloat(document.getElementById(`overage-price-${tool}`).value);
+      async function saveProtection(tool) {
+        const maxSpendRaw = document.getElementById(`max-spend-${tool}`).value;
+        const maxSpend = maxSpendRaw === '' ? null : parseFloat(maxSpendRaw);
         const msg = document.getElementById(`msg-${tool}`);
         msg.className = 'message';
         msg.style.display = 'block';
-        msg.textContent = 'Saving restrictions...';
+        msg.textContent = 'Saving protection...';
         try {
-          const r = await fetch('/config/budget', {
+          const r = await fetch('/config/protection', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tool, total, commit, max_overage: maxOverage, commit_price: commitPrice, overage_price_per_license: overagePrice })
+            body: JSON.stringify({ tool, max_spend: maxSpend })
           });
           if (!r.ok) {
             const err = await r.json();
-            throw new Error(err.detail || 'Restriction failed');
+            throw new Error(err.detail || 'Save failed');
           }
-          msg.textContent = '✓ Restrictions applied successfully';
+          msg.textContent = '✓ Protection saved';
           setTimeout(() => { msg.style.display = 'none'; }, 3000);
         } catch (e) {
           msg.className = 'message error';
