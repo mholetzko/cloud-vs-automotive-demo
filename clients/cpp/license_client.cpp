@@ -34,17 +34,12 @@ static const std::string VENDOR_ID = "techvendor";
 class LicenseClient::Impl {
 public:
     std::string base_url;
-    CURL* curl;
     bool enable_security;
     std::string api_key;
     
     Impl(const std::string& url, bool security = true) 
         : base_url(url), enable_security(security) {
         curl_global_init(CURL_GLOBAL_DEFAULT);
-        curl = curl_easy_init();
-        if (!curl) {
-            throw LicenseException("Failed to initialize CURL");
-        }
         const char* env_key = std::getenv("LICENSE_API_KEY");
         if (env_key) {
             api_key = env_key;
@@ -52,9 +47,6 @@ public:
     }
     
     ~Impl() {
-        if (curl) {
-            curl_easy_cleanup(curl);
-        }
         // Note: avoid curl_global_cleanup to prevent segfaults due to
         // static destructor ordering in some environments
     }
@@ -97,10 +89,14 @@ public:
         Response response;
         std::string url = base_url + endpoint;
         
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.data);
+        CURL* h = curl_easy_init();
+        if (!h) {
+            throw LicenseException("Failed to initialize CURL handle");
+        }
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_POSTFIELDS, json_data.c_str());
+        curl_easy_setopt(h, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(h, CURLOPT_WRITEDATA, &response.data);
         
         struct curl_slist* headers = nullptr;
         headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -123,16 +119,18 @@ public:
             }
         }
         
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(h, CURLOPT_HTTPHEADER, headers);
         
-        CURLcode res = curl_easy_perform(curl);
+        CURLcode res = curl_easy_perform(h);
         curl_slist_free_all(headers);
         
         if (res != CURLE_OK) {
+            curl_easy_cleanup(h);
             throw LicenseException(std::string("CURL error: ") + curl_easy_strerror(res));
         }
         
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.http_code);
+        curl_easy_getinfo(h, CURLINFO_RESPONSE_CODE, &response.http_code);
+        curl_easy_cleanup(h);
         return response;
     }
     
@@ -140,18 +138,24 @@ public:
         Response response;
         std::string url = base_url + endpoint;
         
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.data);
+        CURL* h = curl_easy_init();
+        if (!h) {
+            throw LicenseException("Failed to initialize CURL handle");
+        }
+        curl_easy_setopt(h, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(h, CURLOPT_HTTPGET, 1L);
+        curl_easy_setopt(h, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(h, CURLOPT_WRITEDATA, &response.data);
         
-        CURLcode res = curl_easy_perform(curl);
+        CURLcode res = curl_easy_perform(h);
         
         if (res != CURLE_OK) {
+            curl_easy_cleanup(h);
             throw LicenseException(std::string("CURL error: ") + curl_easy_strerror(res));
         }
         
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.http_code);
+        curl_easy_getinfo(h, CURLINFO_RESPONSE_CODE, &response.http_code);
+        curl_easy_cleanup(h);
         return response;
     }
 };
@@ -260,10 +264,12 @@ void LicenseClient::return_license(const LicenseHandle& handle) {
 }
 
 LicenseStatus LicenseClient::get_status(const std::string& tool) {
-    // URL-encode tool using curl
-    char* escaped = curl_easy_escape(pimpl_->curl, tool.c_str(), static_cast<int>(tool.size()));
+    // URL-encode tool using a temporary curl handle
+    CURL* h = curl_easy_init();
+    char* escaped = h ? curl_easy_escape(h, tool.c_str(), static_cast<int>(tool.size())) : nullptr;
     std::string encoded_tool = escaped ? std::string(escaped) : tool;
     if (escaped) curl_free(escaped);
+    if (h) curl_easy_cleanup(h);
     auto response = pimpl_->http_get("/licenses/" + encoded_tool + "/status");
     
     if (response.http_code != 200) {
