@@ -289,22 +289,24 @@ toolFilterSelector.addEventListener('change', (e) => {
     document.getElementById('overview-charts').style.display = 'none';
     document.getElementById('tool-specific-charts').style.display = 'block';
     
-    // Load buffered data for this tool
-    const toolData = chartDataBuffer.getToolData(selectedTool);
-    toolBorrowChart.data.labels = [...toolData.timestamps];
-    toolBorrowChart.data.datasets[0].data = [...toolData.borrows];
-    toolBorrowChart.data.datasets[0].metadata = [...toolData.metadata];
+    // Load buffered data for this tool from server-side cache immediately
+    if (toolMetricsCache) {
+      updateToolSpecificCharts(selectedTool, toolMetricsCache);
+    } else {
+      // Clear while waiting for first SSE payload
+      toolBorrowChart.data.labels = [];
+      toolBorrowChart.data.datasets[0].data = [];
+      toolBorrowChart.data.datasets[0].metadata = [];
+      toolBorrowChart.update();
+    }
     
     // Clear other charts (will be populated by next SSE update)
     toolUserChart.data.labels = [];
     toolUserChart.data.datasets[0].data = [];
     toolCommitChart.data.datasets[0].data = [0, 0, 0];
     
-    toolBorrowChart.update();
     toolUserChart.update();
     toolCommitChart.update();
-    
-    console.log(`Loaded ${toolData.timestamps.length} buffered data points for ${selectedTool}`);
   }
   
   console.log(`Tool filter changed to: ${selectedTool}`);
@@ -366,7 +368,7 @@ function updateToolSpecificCharts(tool, toolMetrics) {
   
   // Fetch current tool status and borrows for other charts
   Promise.all([
-    fetch(`/status/${encodeURIComponent(tool)}`).then(res => res.json()),
+    fetch(`/licenses/${encodeURIComponent(tool)}/status`).then(res => res.json()),
     fetch(`/borrows?user=all`).then(res => res.json())
   ]).then(([toolStatus, allBorrows]) => {
     // Update tool info
