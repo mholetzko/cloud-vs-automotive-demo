@@ -5,9 +5,11 @@ use rand::Rng;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::Semaphore;
 use tokio::time::sleep;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "License Server Stress Testing Tool", long_about = None)]
@@ -96,9 +98,30 @@ async fn borrow_license(
         user: user.to_string(),
     };
 
-    let response = client
-        .post(&url)
-        .json(&req)
+    // Security headers: Authorization + HMAC signature
+    let api_key = std::env::var("LICENSE_API_KEY").ok();
+    let vendor_id = "techvendor";
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs().to_string();
+
+    // Build signature payload: tool|user|timestamp|api_key (if provided)
+    let payload = match &api_key {
+        Some(k) => format!("{}|{}|{}|{}", tool, user, &timestamp, k),
+        None => format!("{}|{}|{}", tool, user, &timestamp),
+    };
+    // Vendor secret must match server demo secret
+    let vendor_secret = "techvendor_secret_ecu_2025_demo_xyz789abc123def456";
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = HmacSha256::new_from_slice(vendor_secret.as_bytes()).map_err(|e| e.to_string())?;
+    mac.update(payload.as_bytes());
+    let signature = hex::encode(mac.finalize().into_bytes());
+
+    let mut req_builder = client.post(&url).json(&req)
+        .header("X-Signature", signature)
+        .header("X-Timestamp", timestamp)
+        .header("X-Vendor-ID", vendor_id);
+    if let Some(k) = api_key { req_builder = req_builder.header("Authorization", format!("Bearer {}", k)); }
+
+    let response = req_builder
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
@@ -129,12 +152,12 @@ async fn return_license(
         id: borrow_id.to_string(),
     };
 
-    let response = client
-        .post(&url)
-        .json(&req)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    // Add Authorization header if API key present (return does not require signature)
+    let api_key = std::env::var("LICENSE_API_KEY").ok();
+    let mut req_builder = client.post(&url).json(&req);
+    if let Some(k) = api_key { req_builder = req_builder.header("Authorization", format!("Bearer {}", k)); }
+
+    let response = req_builder.send().await.map_err(|e| format!("Request failed: {}", e))?;
 
     if response.status().is_success() {
         Ok(())
