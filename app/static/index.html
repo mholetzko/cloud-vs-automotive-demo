@@ -49,7 +49,7 @@
       }
       .tiles {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 2px;
         background: #e0e0e0;
         border: 1px solid #e0e0e0;
@@ -248,6 +248,19 @@
             <h2>Budget Config</h2>
             <p>Configure license pools, commit levels, and pricing</p>
           </a>
+
+          <a href="/multitenant" class="tile">
+            <div class="tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </div>
+            <h2>Multi-Tenant Demo</h2>
+            <p>Vendor portal and customer tenants (BMW, Mercedes, Audi)</p>
+          </a>
         </div>
       </div>
 
@@ -278,6 +291,18 @@
             <div class="feature-item">
               <h4>Performance Testing</h4>
               <p>Built-in Rust stress testing tool for load validation with parallel execution and detailed metrics</p>
+            </div>
+            <div class="feature-item">
+              <h4>Multi-Tenant Architecture</h4>
+              <p>Complete SaaS demo with vendor portal, customer tenants, and license provisioning workflows</p>
+            </div>
+            <div class="feature-item">
+              <h4>Security by Design</h4>
+              <p>HMAC signatures, client certificates, TPM hardware keys - 7 layers of protection against license theft</p>
+            </div>
+            <div class="feature-item">
+              <h4>Cloud-Native</h4>
+              <p>Designed for cloud deployment with automatic scaling, observability, and DevOps best practices</p>
             </div>
           </div>
         </div>

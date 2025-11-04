@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multi-Tenant Demo • Cloud License Server</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+      .mt-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+      .mt-hero {
+        text-align: center;
+        margin-bottom: 60px;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+        border-radius: 8px;
+      }
+      .mt-hero h1 {
+        font-size: 42px;
+        font-weight: 200;
+        margin: 0 0 16px 0;
+        letter-spacing: -1px;
+      }
+      .mt-hero p {
+        font-size: 16px;
+        color: #666;
+        margin: 0;
+        line-height: 1.6;
+      }
+      .mt-section {
+        margin-bottom: 60px;
+      }
+      .mt-section h2 {
+        font-size: 24px;
+        font-weight: 400;
+        margin-bottom: 24px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #e0e0e0;
+      }
+      .mt-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+      }
+      .mt-card {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 24px;
+        transition: all 0.3s ease;
+      }
+      .mt-card:hover {
+        border-color: var(--mb-blue);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+      .mt-card h3 {
+        font-size: 18px;
+        font-weight: 500;
+        margin: 0 0 12px 0;
+      }
+      .mt-card p {
+        font-size: 14px;
+        color: #666;
+        margin: 0 0 16px 0;
+        line-height: 1.6;
+      }
+      .mt-card .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        background: #e3f2fd;
+        color: #1565c0;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-right: 8px;
+      }
+      .mt-card .badge-vendor {
+        background: #f3e5f5;
+        color: #7b1fa2;
+      }
+      .mt-info {
+        background: #fffde7;
+        border-left: 4px solid #fbc02d;
+        padding: 16px;
+        margin-bottom: 24px;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .mt-code {
+        background: #f5f5f5;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 16px;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+        overflow-x: auto;
+        margin: 16px 0;
+      }
+      .mt-btn {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #000;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: background 0.3s;
+      }
+      .mt-btn:hover {
+        background: #333;
+      }
+      .mt-diagram {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 32px;
+        margin: 32px 0;
+        font-family: monospace;
+        font-size: 12px;
+        line-height: 1.8;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="mb-header">
+      <div class="mb-brand">Cloud License Server</div>
+      <nav class="mb-nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/presentation">Presentation</a>
+      </nav>
+    </header>
+
+    <div class="mt-container">
+      <div class="mt-hero">
+        <h1>🏢 Multi-Tenant SaaS Architecture</h1>
+        <p>Complete vendor-customer workflow with isolated tenants and license provisioning</p>
+      </div>
+
+      <div class="mt-info">
+        <strong>📌 Note:</strong> This demo shows the <strong>architecture</strong> of a multi-tenant license server.
+        The vendor portal and customer dashboards are fully functional and demonstrate how vendors 
+        (like Vector) can provision licenses to customers (like BMW, Mercedes, Audi) with complete isolation.
+      </div>
+
+      <div class="mt-section">
+        <h2>🏗️ Architecture Overview</h2>
+        <div class="mt-diagram">
+┌──────────────────────────────────────────────────────────────────┐
+│                    MULTI-TENANT LICENSE SERVER                    │
+└──────────────────────────────────────────────────────────────────┘
+
+    Vendor Portal                         Customer Tenants
+         │                                        │
+         ├──► View Customers                     ├──► BMW AG
+         ├──► Provision Licenses                 ├──► Mercedes-Benz AG
+         ├──► Track Usage                        ├──► Audi AG
+         └──► Export Billing                     └──► (Isolated by tenant_id)
+
+┌──────────────────────┐             ┌──────────────────────────────┐
+│  Vector Vendor       │             │  Customer Tenant (BMW)       │
+│                      │             │                              │
+│  • Manage customers  │─────────────▶│  • View licenses            │
+│  • Add products      │             │  • Monitor usage            │
+│  • Set pricing       │             │  • Generate API keys        │
+│  • View analytics    │             │  • Track costs              │
+└──────────────────────┘             └──────────────────────────────┘
+        </div>
+      </div>
+
+      <div class="mt-section">
+        <h2>🚀 Demo Components</h2>
+        <div class="mt-grid">
+          <div class="mt-card">
+            <h3>Vendor Portal</h3>
+            <span class="badge badge-vendor">Vector</span>
+            <p>Centralized portal where software vendors (like Vector Informatik) manage their customers and license provisioning.</p>
+            <p><strong>Features:</strong></p>
+            <ul style="font-size: 13px; color: #666; line-height: 1.8;">
+              <li>View all customers</li>
+              <li>Provision new licenses</li>
+              <li>Track customer activity</li>
+              <li>Export billing data (CRM-linked)</li>
+            </ul>
+          </div>
+
+          <div class="mt-card">
+            <h3>Customer Tenants</h3>
+            <span class="badge">BMW</span>
+            <span class="badge">Mercedes</span>
+            <span class="badge">Audi</span>
+            <p>Each customer has an isolated environment with their own licenses, users, and analytics.</p>
+            <p><strong>Features:</strong></p>
+            <ul style="font-size: 13px; color: #666; line-height: 1.8;">
+              <li>View licensed products</li>
+              <li>Monitor real-time usage</li>
+              <li>See commit vs. overage</li>
+              <li>Track costs per vendor</li>
+            </ul>
+          </div>
+
+          <div class="mt-card">
+            <h3>License Provisioning</h3>
+            <span class="badge">Automated</span>
+            <p>Vendors can instantly provision licenses to customers through the portal or CRM integration.</p>
+            <p><strong>Workflow:</strong></p>
+            <ul style="font-size: 13px; color: #666; line-height: 1.8;">
+              <li>Vendor selects customer (by CRM ID)</li>
+              <li>Chooses product & quantities</li>
+              <li>Sets pricing (commit + overage)</li>
+              <li>Provisions to customer instantly</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-section">
+        <h2>🔐 Security & Isolation</h2>
+        <div class="mt-grid">
+          <div class="mt-card">
+            <h3>Tenant Isolation</h3>
+            <p>Each customer tenant has:</p>
+            <ul style="font-size: 13px; color: #666; line-height: 1.8;">
+              <li><strong>Isolated database:</strong> All queries scoped by <code>tenant_id</code></li>
+              <li><strong>Separate subdomain:</strong> <code>bmw.cloudlicenses.com</code></li>
+              <li><strong>Unique API keys:</strong> Per-tenant authentication</li>
+              <li><strong>Isolated metrics:</strong> No cross-tenant data visibility</li>
+            </ul>
+          </div>
+
+          <div class="mt-card">
+            <h3>Data Protection</h3>
+            <p>Prevent unauthorized access:</p>
+            <ul style="font-size: 13px; color: #666; line-height: 1.8;">
+              <li><strong>HMAC signatures:</strong> Vendor secret validation</li>
+              <li><strong>Client certificates:</strong> mTLS authentication</li>
+              <li><strong>TPM hardware keys:</strong> Physical device binding</li>
+              <li><strong>Audit logging:</strong> Track all access attempts</li>
+            </ul>
+          </div>
+
+          <div class="mt-card">
+            <h3>CRM Integration</h3>
+            <p>Link to sales systems:</p>
+            <ul style="font-size: 13px; color: #666; line-height: 1.8;">
+              <li><strong>CRM IDs:</strong> Map customers to Salesforce/SAP</li>
+              <li><strong>Opportunity tracking:</strong> Link licenses to deals</li>
+              <li><strong>Billing export:</strong> Per-customer invoicing</li>
+              <li><strong>Webhooks:</strong> Auto-provision on deal close</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-section">
+        <h2>💡 Use Cases</h2>
+        <div class="mt-grid">
+          <div class="mt-card">
+            <h3>Automotive Software Vendors</h3>
+            <p>Vector, Greenhills, MathWorks selling tools to BMW, Mercedes, Audi for ECU development</p>
+          </div>
+          <div class="mt-card">
+            <h3>Cloud Development Tools</h3>
+            <p>JetBrains, GitHub, GitLab providing licenses to enterprise customers</p>
+          </div>
+          <div class="mt-card">
+            <h3>Engineering Software</h3>
+            <p>MATLAB, Simulink, Ansys licensing for engineering teams at manufacturing companies</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-section">
+        <h2>📚 Documentation</h2>
+        <p>Comprehensive documentation available in the GitHub repository:</p>
+        <div style="margin-top: 20px;">
+          <a href="https://github.com/mholetzko/cloud-vs-automotive-demo/blob/main/CLOUD_LICENSE_PROTOCOL.md" target="_blank" class="mt-btn">Cloud License Protocol</a>
+          <a href="https://github.com/mholetzko/cloud-vs-automotive-demo/blob/main/MULTITENANT_ARCHITECTURE.md" target="_blank" class="mt-btn" style="margin-left: 10px;">Multi-Tenant Architecture</a>
+          <a href="https://github.com/mholetzko/cloud-vs-automotive-demo/blob/main/LICENSE_THEFT_PREVENTION.md" target="_blank" class="mt-btn" style="margin-left: 10px;">Security Guide</a>
+        </div>
+      </div>
+
+      <div class="mt-section">
+        <h2>🎯 Next Steps</h2>
+        <div class="mt-info" style="background: #e8f5e9; border-left-color: #43a047;">
+          <strong>✅ Foundation Complete!</strong><br>
+          This demo proves the multi-tenant architecture works. For production deployment:
+          <ol style="margin: 12px 0 0 20px; line-height: 1.8;">
+            <li>Deploy to real domain (e.g., <code>cloudlicenses.com</code>)</li>
+            <li>Add OAuth 2.0 authentication for vendors</li>
+            <li>Implement JWT tokens for tenant access</li>
+            <li>Add CRM webhook integration (Salesforce, SAP)</li>
+            <li>Enable HMAC signature validation</li>
+            <li>Add billing export & invoice generation</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div>© 2025 Matthias Holetzko</div>
+      <div>
+        <a href="/">Home</a> • 
+        <a href="/dashboard">Dashboard</a> • 
+        <a href="https://github.com/mholetzko/cloud-vs-automotive-demo" target="_blank">GitHub</a>
+      </div>
+    </footer>
+  </body>
+</html>
+

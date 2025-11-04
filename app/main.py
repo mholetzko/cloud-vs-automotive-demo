@@ -548,6 +548,13 @@ def presentation_page():
         return f.read()
 
 
+@app.get("/multitenant", response_class=HTMLResponse)
+def multitenant_page():
+    """Multi-tenant demo overview page"""
+    with open("app/static/multitenant.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
 @app.get("/version")
 def get_version() -> Dict[str, str]:
     return {"version": APP_VERSION}
