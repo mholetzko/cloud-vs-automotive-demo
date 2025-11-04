@@ -34,40 +34,128 @@ def get_connection(readonly: bool = False) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
-def initialize_database(tools_config: Optional[List[dict]] = None) -> None:
+def initialize_database(tools_config: Optional[List[dict]] = None, enable_multitenant: bool = False) -> None:
     """
     Initialize database with optional seed data.
     
     Args:
         tools_config: List of dicts with keys: tool, total, commit_qty, max_overage, commit_price (optional), overage_price_per_license (optional)
+        enable_multitenant: If True, add multi-tenant tables and seed data
     """
     with get_connection(readonly=False) as conn:
         cur = conn.cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS licenses (
-                tool TEXT PRIMARY KEY,
-                total INTEGER NOT NULL,
-                borrowed INTEGER NOT NULL DEFAULT 0,
-                commit_qty INTEGER DEFAULT 0,
-                max_overage INTEGER DEFAULT 0,
-                commit_price REAL DEFAULT 0.0,
-                overage_price_per_license REAL DEFAULT 0.0
+        
+        # Multi-tenant tables (if enabled)
+        if enable_multitenant:
+            # Tenants (customers like BMW, Mercedes, Audi)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tenants (
+                    tenant_id TEXT PRIMARY KEY,
+                    company_name TEXT NOT NULL,
+                    domain TEXT,
+                    crm_id TEXT UNIQUE,
+                    status TEXT DEFAULT 'active',
+                    created_at TEXT NOT NULL
+                )
+                """
             )
-            """
-        )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS borrows (
-                id TEXT PRIMARY KEY,
-                tool TEXT NOT NULL,
-                user TEXT NOT NULL,
-                borrowed_at TEXT NOT NULL,
-                is_overage INTEGER NOT NULL DEFAULT 0,
-                FOREIGN KEY(tool) REFERENCES licenses(tool)
+            
+            # Vendors (like Vector, Greenhills)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS vendors (
+                    vendor_id TEXT PRIMARY KEY,
+                    vendor_name TEXT NOT NULL,
+                    contact_email TEXT,
+                    api_key_hash TEXT,
+                    created_at TEXT NOT NULL
+                )
+                """
             )
-            """
-        )
+            
+            # License packages (vendor → tenant)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS license_packages (
+                    package_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    vendor_id TEXT NOT NULL,
+                    product_id TEXT NOT NULL,
+                    product_name TEXT NOT NULL,
+                    crm_opportunity_id TEXT,
+                    status TEXT DEFAULT 'active',
+                    provisioned_at TEXT NOT NULL,
+                    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id),
+                    FOREIGN KEY(vendor_id) REFERENCES vendors(vendor_id)
+                )
+                """
+            )
+        
+        # Licenses table (now with tenant_id for multi-tenant mode)
+        if enable_multitenant:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS licenses (
+                    id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    package_id TEXT,
+                    tool TEXT NOT NULL,
+                    total INTEGER NOT NULL,
+                    borrowed INTEGER NOT NULL DEFAULT 0,
+                    commit_qty INTEGER DEFAULT 0,
+                    max_overage INTEGER DEFAULT 0,
+                    commit_price REAL DEFAULT 0.0,
+                    overage_price_per_license REAL DEFAULT 0.0,
+                    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id),
+                    FOREIGN KEY(package_id) REFERENCES license_packages(package_id),
+                    UNIQUE(tenant_id, tool)
+                )
+                """
+            )
+        else:
+            # Original single-tenant schema
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS licenses (
+                    tool TEXT PRIMARY KEY,
+                    total INTEGER NOT NULL,
+                    borrowed INTEGER NOT NULL DEFAULT 0,
+                    commit_qty INTEGER DEFAULT 0,
+                    max_overage INTEGER DEFAULT 0,
+                    commit_price REAL DEFAULT 0.0,
+                    overage_price_per_license REAL DEFAULT 0.0
+                )
+                """
+            )
+        # Borrows table (tenant-aware if multi-tenant)
+        if enable_multitenant:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS borrows (
+                    id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    tool TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    borrowed_at TEXT NOT NULL,
+                    is_overage INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id)
+                )
+                """
+            )
+        else:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS borrows (
+                    id TEXT PRIMARY KEY,
+                    tool TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    borrowed_at TEXT NOT NULL,
+                    is_overage INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY(tool) REFERENCES licenses(tool)
+                )
+                """
+            )
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -76,20 +164,38 @@ def initialize_database(tools_config: Optional[List[dict]] = None) -> None:
             )
             """
         )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS overage_charges (
-                id TEXT PRIMARY KEY,
-                tool TEXT NOT NULL,
-                borrow_id TEXT NOT NULL,
-                user TEXT NOT NULL,
-                charged_at TEXT NOT NULL,
-                amount REAL NOT NULL,
-                FOREIGN KEY(tool) REFERENCES licenses(tool),
-                FOREIGN KEY(borrow_id) REFERENCES borrows(id)
+        # Overage charges table (tenant-aware if multi-tenant)
+        if enable_multitenant:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS overage_charges (
+                    id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    tool TEXT NOT NULL,
+                    borrow_id TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    charged_at TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id),
+                    FOREIGN KEY(borrow_id) REFERENCES borrows(id)
+                )
+                """
             )
-            """
-        )
+        else:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS overage_charges (
+                    id TEXT PRIMARY KEY,
+                    tool TEXT NOT NULL,
+                    borrow_id TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    charged_at TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    FOREIGN KEY(tool) REFERENCES licenses(tool),
+                    FOREIGN KEY(borrow_id) REFERENCES borrows(id)
+                )
+                """
+            )
         if tools_config:
             for config in tools_config:
                 tool = config["tool"]
@@ -289,5 +395,175 @@ def get_overage_charges(tool: Optional[str] = None) -> List[dict]:
                 "amount": float(r["amount"])
             })
         return result
+
+
+# ============================================================================
+# MULTI-TENANT FUNCTIONS
+# ============================================================================
+
+def seed_multitenant_demo_data() -> None:
+    """Seed database with demo tenants, vendors, and licenses for demo"""
+    from datetime import datetime
+    import uuid
+    
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        now = datetime.utcnow().isoformat()
+        
+        # Create 3 tenant companies
+        tenants = [
+            {"id": "bmw", "name": "BMW AG", "domain": "bmw.com", "crm_id": "CRM-BMW-001"},
+            {"id": "mercedes", "name": "Mercedes-Benz AG", "domain": "mercedes.com", "crm_id": "CRM-MB-002"},
+            {"id": "audi", "name": "Audi AG", "domain": "audi.com", "crm_id": "CRM-AUDI-003"},
+        ]
+        
+        for tenant in tenants:
+            cur.execute(
+                "INSERT OR IGNORE INTO tenants(tenant_id, company_name, domain, crm_id, status, created_at) VALUES (?, ?, ?, ?, 'active', ?)",
+                (tenant["id"], tenant["name"], tenant["domain"], tenant["crm_id"], now)
+            )
+        
+        # Create Vector as vendor
+        cur.execute(
+            "INSERT OR IGNORE INTO vendors(vendor_id, vendor_name, contact_email, created_at) VALUES (?, ?, ?, ?)",
+            ("vector", "Vector Informatik GmbH", "sales@vector.com", now)
+        )
+        
+        # License packages and licenses for each tenant
+        products = [
+            {"id": "davinci-se", "name": "DaVinci Configurator SE", "total": 20, "commit": 5, "overage": 15, "commit_price": 5000.0, "overage_price": 500.0},
+            {"id": "davinci-ide", "name": "DaVinci Configurator IDE", "total": 10, "commit": 10, "overage": 0, "commit_price": 3000.0, "overage_price": 0.0},
+        ]
+        
+        for tenant in tenants:
+            for product in products:
+                # Create package
+                package_id = f"pkg-{tenant['id']}-{product['id']}-{uuid.uuid4().hex[:8]}"
+                cur.execute(
+                    "INSERT OR IGNORE INTO license_packages(package_id, tenant_id, vendor_id, product_id, product_name, crm_opportunity_id, status, provisioned_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?)",
+                    (package_id, tenant["id"], "vector", product["id"], product["name"], f"CRM-OPP-{tenant['crm_id']}-{product['id']}", now)
+                )
+                
+                # Create license for tenant
+                license_id = f"lic-{tenant['id']}-{product['id']}-{uuid.uuid4().hex[:8]}"
+                cur.execute(
+                    "INSERT OR IGNORE INTO licenses(id, tenant_id, package_id, tool, total, borrowed, commit_qty, max_overage, commit_price, overage_price_per_license) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
+                    (license_id, tenant["id"], package_id, product["name"], product["total"], product["commit"], product["overage"], product["commit_price"], product["overage_price"])
+                )
+        
+        conn.commit()
+
+
+def get_all_tenants() -> List[dict]:
+    """Get all tenants"""
+    with get_connection(True) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT tenant_id, company_name, domain, crm_id, status, created_at FROM tenants ORDER BY company_name ASC")
+        rows = cur.fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_vendor_customers(vendor_id: str) -> List[dict]:
+    """Get all customers (tenants) for a vendor"""
+    with get_connection(True) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT DISTINCT 
+                t.tenant_id, 
+                t.company_name, 
+                t.domain, 
+                t.crm_id,
+                COUNT(DISTINCT lp.package_id) as package_count
+            FROM tenants t
+            JOIN license_packages lp ON t.tenant_id = lp.tenant_id
+            WHERE lp.vendor_id = ? AND lp.status = 'active'
+            GROUP BY t.tenant_id
+            ORDER BY t.company_name ASC
+            """,
+            (vendor_id,)
+        )
+        rows = cur.fetchall()
+        result = []
+        for row in rows:
+            result.append({
+                "tenant_id": row["tenant_id"],
+                "company_name": row["company_name"],
+                "domain": row["domain"],
+                "crm_id": row["crm_id"],
+                "active_licenses": row["package_count"]
+            })
+        return result
+
+
+def get_tenant_licenses(tenant_id: str) -> List[dict]:
+    """Get all licenses for a tenant"""
+    with get_connection(True) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT 
+                l.id, 
+                l.tool, 
+                l.total, 
+                l.borrowed, 
+                l.commit_qty, 
+                l.max_overage,
+                l.commit_price,
+                l.overage_price_per_license,
+                lp.vendor_id,
+                v.vendor_name
+            FROM licenses l
+            LEFT JOIN license_packages lp ON l.package_id = lp.package_id
+            LEFT JOIN vendors v ON lp.vendor_id = v.vendor_id
+            WHERE l.tenant_id = ?
+            ORDER BY l.tool ASC
+            """,
+            (tenant_id,)
+        )
+        rows = cur.fetchall()
+        result = []
+        for row in rows:
+            result.append({
+                "id": row["id"],
+                "tool": row["tool"],
+                "total": int(row["total"]),
+                "borrowed": int(row["borrowed"]),
+                "commit": int(row["commit_qty"] or 0),
+                "max_overage": int(row["max_overage"] or 0),
+                "available": max(int(row["total"]) - int(row["borrowed"]), 0),
+                "commit_price": float(row["commit_price"] or 0.0),
+                "overage_price_per_license": float(row["overage_price_per_license"] or 0.0),
+                "vendor_id": row["vendor_id"],
+                "vendor_name": row["vendor_name"]
+            })
+        return result
+
+
+def provision_license_to_tenant(vendor_id: str, tenant_id: str, product_config: dict) -> str:
+    """Provision a new license from vendor to tenant. Returns package_id"""
+    from datetime import datetime
+    import uuid
+    
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        now = datetime.utcnow().isoformat()
+        
+        # Create package
+        package_id = f"pkg-{tenant_id}-{product_config['product_id']}-{uuid.uuid4().hex[:8]}"
+        cur.execute(
+            "INSERT INTO license_packages(package_id, tenant_id, vendor_id, product_id, product_name, crm_opportunity_id, status, provisioned_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?)",
+            (package_id, tenant_id, vendor_id, product_config["product_id"], product_config["product_name"], product_config.get("crm_opportunity_id"), now)
+        )
+        
+        # Create license
+        license_id = f"lic-{tenant_id}-{product_config['product_id']}-{uuid.uuid4().hex[:8]}"
+        cur.execute(
+            "INSERT INTO licenses(id, tenant_id, package_id, tool, total, borrowed, commit_qty, max_overage, commit_price, overage_price_per_license) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
+            (license_id, tenant_id, package_id, product_config["product_name"], product_config["total"], product_config["commit_qty"], product_config["max_overage"], product_config.get("commit_price", 1000.0), product_config.get("overage_price_per_license", 100.0))
+        )
+        
+        conn.commit()
+        return package_id
 
 
