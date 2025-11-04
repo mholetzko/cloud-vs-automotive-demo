@@ -34,7 +34,10 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
 /// Custom error type for license operations
 #[derive(Error, Debug)]
@@ -153,19 +156,58 @@ impl Drop for LicenseHandle {
 pub struct LicenseClient {
     client: Arc<reqwest::Client>,
     base_url: String,
+    enable_security: bool,
 }
 
+// Vendor secret - embedded in the client library binary
+// In production, this would be obfuscated/encrypted
+const VENDOR_SECRET: &str = "techvendor_secret_ecu_2025_demo_xyz789abc123def456";
+const VENDOR_ID: &str = "techvendor";
+
 impl LicenseClient {
-    /// Create a new license client
+    /// Create a new license client with security enabled by default
     ///
     /// # Arguments
     ///
     /// * `base_url` - Base URL of the license server (e.g., "http://localhost:8000")
     pub fn new(base_url: impl Into<String>) -> Self {
+        Self::with_security(base_url, true)
+    }
+    
+    /// Create a new license client with configurable security
+    ///
+    /// # Arguments
+    ///
+    /// * `base_url` - Base URL of the license server
+    /// * `enable_security` - Whether to enable HMAC signature authentication
+    pub fn with_security(base_url: impl Into<String>, enable_security: bool) -> Self {
         Self {
             client: Arc::new(reqwest::Client::new()),
             base_url: base_url.into(),
+            enable_security,
         }
+    }
+    
+    /// Generate HMAC signature for request authentication
+    fn generate_signature(&self, tool: &str, user: &str, timestamp: &str) -> String {
+        type HmacSha256 = Hmac<Sha256>;
+        
+        let payload = format!("{}|{}|{}", tool, user, timestamp);
+        let mut mac = HmacSha256::new_from_slice(VENDOR_SECRET.as_bytes())
+            .expect("HMAC can take key of any size");
+        mac.update(payload.as_bytes());
+        
+        let result = mac.finalize();
+        hex::encode(result.into_bytes())
+    }
+    
+    /// Get current Unix timestamp as string
+    fn get_timestamp() -> String {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            .to_string()
     }
     
     /// Borrow a license for a specific tool
@@ -198,14 +240,27 @@ impl LicenseClient {
         }
         
         let url = format!("{}/licenses/borrow", self.base_url);
-        let response = self.client
+        
+        // Build request with optional security headers
+        let mut request = self.client
             .post(&url)
             .json(&BorrowRequest {
                 tool: tool.clone(),
                 user: user.clone(),
-            })
-            .send()
-            .await?;
+            });
+        
+        // Add security headers if enabled
+        if self.enable_security {
+            let timestamp = Self::get_timestamp();
+            let signature = self.generate_signature(&tool, &user, &timestamp);
+            
+            request = request
+                .header("X-Signature", signature)
+                .header("X-Timestamp", timestamp)
+                .header("X-Vendor-ID", VENDOR_ID);
+        }
+        
+        let response = request.send().await?;
         
         let status = response.status();
         

@@ -103,16 +103,24 @@ public:
 };
 
 /**
- * @brief Main license client class
+ * @brief Main license client class with HMAC security
  */
 class LicenseClient {
 public:
     /**
-     * @brief Construct a license client
+     * @brief Construct a license client with security enabled by default
      * 
      * @param base_url Base URL of the license server
      */
     explicit LicenseClient(const std::string& base_url);
+    
+    /**
+     * @brief Construct a license client with configurable security
+     * 
+     * @param base_url Base URL of the license server
+     * @param enable_security Whether to enable HMAC signature authentication
+     */
+    LicenseClient(const std::string& base_url, bool enable_security);
     
     /**
      * @brief Destructor

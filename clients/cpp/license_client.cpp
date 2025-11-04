@@ -7,6 +7,10 @@
 #include <curl/curl.h>
 #include <json/json.h>
 #include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
 
 namespace license {
 
@@ -21,13 +25,20 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
     return size * nmemb;
 }
 
+// Vendor secret - embedded in the client library binary
+// In production, this would be obfuscated/encrypted
+static const std::string VENDOR_SECRET = "techvendor_secret_ecu_2025_demo_xyz789abc123def456";
+static const std::string VENDOR_ID = "techvendor";
+
 // PIMPL implementation
 class LicenseClient::Impl {
 public:
     std::string base_url;
     CURL* curl;
+    bool enable_security;
     
-    Impl(const std::string& url) : base_url(url) {
+    Impl(const std::string& url, bool security = true) 
+        : base_url(url), enable_security(security) {
         curl_global_init(CURL_GLOBAL_DEFAULT);
         curl = curl_easy_init();
         if (!curl) {
@@ -42,7 +53,36 @@ public:
         curl_global_cleanup();
     }
     
-    Response http_post(const std::string& endpoint, const std::string& json_data) {
+    // Generate HMAC-SHA256 signature
+    std::string generate_signature(const std::string& tool, 
+                                   const std::string& user, 
+                                   const std::string& timestamp) {
+        std::string payload = tool + "|" + user + "|" + timestamp;
+        
+        unsigned char* digest = HMAC(EVP_sha256(),
+                                     VENDOR_SECRET.c_str(), VENDOR_SECRET.length(),
+                                     (unsigned char*)payload.c_str(), payload.length(),
+                                     nullptr, nullptr);
+        
+        // Convert to hex string
+        std::stringstream ss;
+        for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+            ss << std::hex << std::setw(2) << std::setfill('0') << (int)digest[i];
+        }
+        return ss.str();
+    }
+    
+    // Get current Unix timestamp as string
+    std::string get_timestamp() {
+        auto now = std::chrono::system_clock::now();
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+            now.time_since_epoch()
+        ).count();
+        return std::to_string(seconds);
+    }
+    
+    Response http_post(const std::string& endpoint, const std::string& json_data,
+                       const std::string& tool = "", const std::string& user = "") {
         Response response;
         std::string url = base_url + endpoint;
         
@@ -53,6 +93,21 @@ public:
         
         struct curl_slist* headers = nullptr;
         headers = curl_slist_append(headers, "Content-Type: application/json");
+        
+        // Add security headers if enabled and tool/user provided
+        if (enable_security && !tool.empty() && !user.empty()) {
+            std::string timestamp = get_timestamp();
+            std::string signature = generate_signature(tool, user, timestamp);
+            
+            std::string sig_header = "X-Signature: " + signature;
+            std::string ts_header = "X-Timestamp: " + timestamp;
+            std::string vendor_header = "X-Vendor-ID: " + VENDOR_ID;
+            
+            headers = curl_slist_append(headers, sig_header.c_str());
+            headers = curl_slist_append(headers, ts_header.c_str());
+            headers = curl_slist_append(headers, vendor_header.c_str());
+        }
+        
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         
         CURLcode res = curl_easy_perform(curl);
@@ -147,7 +202,8 @@ LicenseHandle LicenseClient::borrow(const std::string& tool, const std::string& 
     Json::StreamWriterBuilder writer;
     std::string json_data = Json::writeString(writer, request);
     
-    auto response = pimpl_->http_post("/licenses/borrow", json_data);
+    // Pass tool and user for HMAC signature generation
+    auto response = pimpl_->http_post("/licenses/borrow", json_data, tool, user);
     
     if (response.http_code == 409) {
         throw NoLicensesAvailableException(tool);
