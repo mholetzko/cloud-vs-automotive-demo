@@ -358,6 +358,51 @@
       </div>
     </div>
 
+    <!-- Budget Configuration Modal -->
+    <div id="budget-modal" class="modal">
+      <div class="modal-content">
+        <h2>Configure Customer Budget</h2>
+        <div style="margin-bottom: 15px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 5px;">Select Tool:</label>
+          <select id="budget-tool-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+            <option value="">-- Select a tool --</option>
+            <option value="ECU Development Suite">ECU Development Suite</option>
+            <option value="GreenHills Multi IDE">GreenHills Multi IDE</option>
+            <option value="AUTOSAR Configuration Tool">AUTOSAR Configuration Tool</option>
+            <option value="CAN Bus Analyzer Pro">CAN Bus Analyzer Pro</option>
+            <option value="Model-Based Design Studio">Model-Based Design Studio</option>
+          </select>
+        </div>
+        <div id="budget-config-form" style="display: none;">
+          <div class="form-group">
+            <label>Total Licenses</label>
+            <input type="number" id="budget-total" min="1" required>
+            <small>Maximum licenses customer can use</small>
+          </div>
+          <div class="form-group">
+            <label>Commit Quantity</label>
+            <input type="number" id="budget-commit" min="0" required>
+            <small>Fixed allocation (always available)</small>
+          </div>
+          <div class="form-group">
+            <label>Max Overage</label>
+            <input type="number" id="budget-overage" min="0" required>
+            <small>Additional licenses (higher cost)</small>
+          </div>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0;"><strong>Current Status:</strong></p>
+            <p style="margin: 5px 0; font-size: 0.9rem;" id="budget-status-vendor"><strong>Vendor Limits:</strong> <span id="vendor-limits">-</span></p>
+            <p style="margin: 5px 0; font-size: 0.9rem;" id="budget-status-customer"><strong>Customer Restrictions:</strong> <span id="customer-limits">None set</span></p>
+            <p style="margin: 5px 0; font-size: 0.9rem;" id="budget-status-active"><strong>Active Config:</strong> <span id="active-limits">-</span></p>
+          </div>
+          <div style="display:flex; gap: 8px;">
+            <button type="button" class="btn" onclick="saveVendorBudget()">Save</button>
+            <button type="button" class="btn btn-secondary" onclick="hideBudgetModal()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <footer class="footer">
       <div>© 2025 Matthias Holetzko</div>
       <div>
@@ -399,6 +444,18 @@
               <td><code>${c.crm_id || 'N/A'}</code></td>
               <td><span class="badge badge-success">${c.active_licenses} active</span></td>
               <td><span class="badge badge-blue">${c.status || 'active'}</span></td>
+              <td>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <select class="tool-select" data-tenant="${c.tenant_id}" style="padding:6px; border:1px solid #ddd;">
+                    <option value="ECU Development Suite">ECU Development Suite</option>
+                    <option value="GreenHills Multi IDE">GreenHills Multi IDE</option>
+                    <option value="AUTOSAR Configuration Tool">AUTOSAR Configuration Tool</option>
+                    <option value="CAN Bus Analyzer Pro">CAN Bus Analyzer Pro</option>
+                    <option value="Model-Based Design Studio">Model-Based Design Studio</option>
+                  </select>
+                  <button class="btn" onclick="openBudgetModalForRow(this)">Configure</button>
+                </div>
+              </td>
             </tr>
           `).join('');
           
@@ -610,6 +667,26 @@
           alert('❌ Error saving budget');
           console.error(err);
         }
+      }
+
+      // Budget modal helpers
+      function openBudgetModalForRow(btn) {
+        const row = btn.closest('tr');
+        const select = row.querySelector('select.tool-select');
+        const tool = select ? select.value : '';
+        const modal = document.getElementById('budget-modal');
+        const toolSel = document.getElementById('budget-tool-select');
+        if (toolSel && tool) {
+          toolSel.value = tool;
+          // Trigger change to load current config
+          toolSel.dispatchEvent(new Event('change'));
+        }
+        modal.classList.add('show');
+      }
+
+      function hideBudgetModal() {
+        const modal = document.getElementById('budget-modal');
+        modal.classList.remove('show');
       }
 
       // Load on page load
