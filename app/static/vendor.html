@@ -520,8 +520,10 @@
         });
       });
 
-      // Budget management
-      document.getElementById('budget-tool-select').addEventListener('change', async (e) => {
+      // Budget management (guarded if elements not present)
+      const budgetSelect = document.getElementById('budget-tool-select');
+      if (budgetSelect) {
+      budgetSelect.addEventListener('change', async (e) => {
         const tool = e.target.value;
         const form = document.getElementById('budget-config-form');
         
@@ -561,9 +563,12 @@
           console.error('Failed to load budget config:', err);
         }
       });
+      }
       
       async function saveVendorBudget() {
-        const tool = document.getElementById('budget-tool-select').value;
+        const toolEl = document.getElementById('budget-tool-select');
+        if (!toolEl) { return; }
+        const tool = toolEl.value;
         const total = parseInt(document.getElementById('budget-total').value);
         const commit = parseInt(document.getElementById('budget-commit').value);
         const overage = parseInt(document.getElementById('budget-overage').value);
@@ -594,8 +599,9 @@
           
           if (response.ok) {
             alert(`✅ Vendor budget set successfully!\n\nCustomers can now restrict (but not exceed) these limits:\n• Total: ${total}\n• Commit: ${commit}\n• Overage: ${overage}`);
-            // Reload to show updated status
-            document.getElementById('budget-tool-select').dispatchEvent(new Event('change'));
+            // Reload to show updated status if element exists
+            const sel = document.getElementById('budget-tool-select');
+            if (sel) sel.dispatchEvent(new Event('change'));
           } else {
             const error = await response.json();
             alert('❌ Error: ' + error.detail);
