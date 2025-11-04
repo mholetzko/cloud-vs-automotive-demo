@@ -186,6 +186,17 @@
                 <div><strong>Max spend:</strong> ${t.customer_max_spend == null ? '—' : `$${Number(t.customer_max_spend).toFixed(2)}`}</div>
                 <div><strong>Remaining:</strong> ${t.customer_max_spend == null ? '—' : `$${Number(t.remaining_spend || 0).toFixed(2)}`}</div>
               </div>
+              <div class="config-actions" style="margin-top:12px; align-items:flex-end;">
+                <div class="config-field" style="flex:2;">
+                  <label>Request to Vendor (optional message)</label>
+                  <input type="text" id="req-msg-${t.tool}" placeholder="e.g., Need +5 overage for next week" />
+                </div>
+                <div class="config-field" style="max-width:160px;">
+                  <label>Req. Overage</label>
+                  <input type="number" id="req-overage-${t.tool}" min="0" placeholder="e.g., 5" />
+                </div>
+                <button class="btn-save" onclick="requestMore('${t.tool}')">Request More</button>
+              </div>
             `;
             out.appendChild(card);
           });
@@ -277,6 +288,30 @@
           await loadApiKeys();
         } catch (e) {
           alert('Failed to revoke key: ' + (e.message || 'unknown error'));
+        }
+      }
+      async function requestMore(tool) {
+        const msg = document.getElementById(`req-msg-${tool}`).value;
+        const over = document.getElementById(`req-overage-${tool}`).value;
+        const out = document.getElementById(`msg-${tool}`);
+        out.className = 'message';
+        out.style.display = 'block';
+        out.textContent = 'Submitting request...';
+        try {
+          const r = await fetch('/api/customer/request-more', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tool, message: msg || null, requested_overage: over ? parseInt(over) : null })
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({ detail: 'Submit failed' }));
+            throw new Error(err.detail || 'Submit failed');
+          }
+          out.textContent = '✓ Request sent to vendor';
+          setTimeout(() => { out.style.display = 'none'; }, 3000);
+        } catch (e) {
+          out.className = 'message error';
+          out.textContent = '✗ ' + (e.message || 'Submit failed');
         }
       }
       loadApiKeys();

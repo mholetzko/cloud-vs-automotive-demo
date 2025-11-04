@@ -261,6 +261,13 @@ class SpendProtectionRequest(BaseModel):
     max_spend: Optional[float] = Field(None, ge=0.0)
 
 
+class RequestMorePayload(BaseModel):
+    tool: str
+    message: Optional[str] = None
+    requested_total: Optional[int] = Field(None, ge=0)
+    requested_overage: Optional[int] = Field(None, ge=0)
+
+
 
 class AddCustomerRequest(BaseModel):
     tenant_id: str
@@ -681,6 +688,40 @@ def update_spend_protection(req: SpendProtectionRequest):
         raise HTTPException(status_code=400, detail="Tool not found")
     logger.info("customer max spend updated tool=%s max_spend=%s", req.tool, str(req.max_spend))
     return {"status": "ok", "tool": req.tool, "max_spend": req.max_spend}
+
+
+@app.post("/api/customer/request-more")
+def customer_request_more(req: RequestMorePayload):
+    """Customers can request more capacity; stored for vendor review (demo)."""
+    from .db import get_connection
+    try:
+        with get_connection(False) as conn:
+            cur = conn.cursor()
+            # Create table if not exists
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS request_more (
+                    id TEXT PRIMARY KEY,
+                    tool TEXT NOT NULL,
+                    message TEXT,
+                    requested_total INTEGER,
+                    requested_overage INTEGER,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            rid = str(uuid.uuid4())
+            created_at = datetime.utcnow().isoformat()
+            cur.execute(
+                "INSERT INTO request_more(id, tool, message, requested_total, requested_overage, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (rid, req.tool, (req.message or ""), req.requested_total, req.requested_overage, created_at)
+            )
+            conn.commit()
+        logger.info("customer_request_more id=%s tool=%s msg=%s total=%s overage=%s", rid, req.tool, (req.message or ""), str(req.requested_total), str(req.requested_overage))
+        return {"status": "queued", "id": rid}
+    except Exception as e:
+        logger.error(f"request_more failed: {e}")
+        raise HTTPException(500, "Failed to submit request")
 
 
 @app.put("/api/vendor/budget")
