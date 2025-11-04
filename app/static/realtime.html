@@ -216,25 +216,76 @@
       </div>
     </div>
 
-    <!-- Charts -->
-    <div class="chart-grid">
-      <!-- Borrow rate chart -->
-      <div class="chart-container">
-        <h3 id="borrow-chart-title" style="margin: 0 0 10px 0; font-size: 16px; color: #666;">License Borrows (Last 30 minutes)</h3>
-        <canvas id="borrowRateChart"></canvas>
+    <!-- Tool selector -->
+    <div style="background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <label for="tool-filter" style="font-size: 14px; font-weight: 500; margin-right: 10px; color: #666;">Focus on Tool:</label>
+      <select id="tool-filter" style="padding: 8px 16px; border-radius: 4px; border: 1px solid #e0e0e0; font-size: 14px; cursor: pointer; min-width: 300px;">
+        <option value="all">All Tools (Overview)</option>
+      </select>
+      <span id="tool-info" style="margin-left: 20px; color: #666; font-size: 13px;"></span>
+    </div>
+
+    <!-- Overview Charts (shown when "All Tools" selected) -->
+    <div id="overview-charts">
+      <div class="chart-grid">
+        <!-- Borrow rate chart -->
+        <div class="chart-container">
+          <h3 id="borrow-chart-title" style="margin: 0 0 10px 0; font-size: 16px; color: #666;">License Borrows - All Tools (Last 30 minutes)</h3>
+          <canvas id="borrowRateChart"></canvas>
+        </div>
+
+        <!-- Overage chart -->
+        <div class="chart-container">
+          <h3 id="overage-chart-title" style="margin: 0 0 10px 0; font-size: 16px; color: #666;">Overage Checkouts - All Tools (Last 30 minutes)</h3>
+          <canvas id="overageChart"></canvas>
+        </div>
       </div>
 
-      <!-- Overage chart -->
+      <!-- License utilization by tool -->
       <div class="chart-container">
-        <h3 id="overage-chart-title" style="margin: 0 0 10px 0; font-size: 16px; color: #666;">Overage Checkouts (Last 30 minutes)</h3>
-        <canvas id="overageChart"></canvas>
+        <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #666;">License Utilization by Tool</h3>
+        <canvas id="utilizationChart"></canvas>
       </div>
     </div>
 
-    <!-- License utilization by tool -->
-    <div class="chart-container">
-      <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #666;">License Utilization by Tool</h3>
-      <canvas id="utilizationChart"></canvas>
+    <!-- Per-Tool Charts (shown when specific tool selected) -->
+    <div id="tool-specific-charts" style="display: none;">
+      <div class="chart-container">
+        <h3 id="tool-borrow-title" style="margin: 0 0 10px 0; font-size: 16px; color: #666;">Borrows Over Time</h3>
+        <canvas id="toolBorrowChart"></canvas>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-container">
+          <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #666;">Active Checkouts by User</h3>
+          <canvas id="toolUserChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+          <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #666;">Commit vs Overage</h3>
+          <canvas id="toolCommitChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Recent Events Table -->
+      <div class="chart-container">
+        <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #666;">Recent Activity</h3>
+        <div id="recent-events" style="max-height: 300px; overflow-y: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead style="position: sticky; top: 0; background: white; border-bottom: 2px solid #e0e0e0;">
+              <tr>
+                <th style="text-align: left; padding: 8px; color: #666;">Time</th>
+                <th style="text-align: left; padding: 8px; color: #666;">Event</th>
+                <th style="text-align: left; padding: 8px; color: #666;">User</th>
+                <th style="text-align: left; padding: 8px; color: #666;">Type</th>
+              </tr>
+            </thead>
+            <tbody id="events-tbody">
+              <tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">No recent activity</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- Connection status -->
