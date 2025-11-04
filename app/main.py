@@ -594,11 +594,53 @@ def get_budget_config():
 
 @app.put("/config/budget")
 def update_budget(req: BudgetConfigRequest):
-    """Update budget configuration for a tool"""
+    """Update budget configuration for a tool (customer restrictions only)"""
+    from app.db import set_customer_budget_restrictions
+    
+    success, error_msg = set_customer_budget_restrictions(
+        req.tool, 
+        req.total, 
+        req.commit, 
+        req.max_overage
+    )
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Also update pricing if changed
     if not update_budget_config(req.tool, req.total, req.commit, req.max_overage, req.commit_price, req.overage_price_per_license):
-        raise HTTPException(status_code=400, detail="Tool not found or total cannot be reduced below current borrows")
-    logger.info("budget updated tool=%s total=%d commit=%d max_overage=%d commit_price=%.2f overage_price=%.2f", req.tool, req.total, req.commit, req.max_overage, req.commit_price, req.overage_price_per_license)
+        raise HTTPException(status_code=400, detail="Failed to update pricing")
+    
+    logger.info("customer budget restricted tool=%s total=%d commit=%d max_overage=%d", req.tool, req.total, req.commit, req.max_overage)
     return {"status": "ok", "tool": req.tool}
+
+
+@app.put("/api/vendor/budget")
+def update_vendor_budget(req: BudgetConfigRequest):
+    """Update vendor-controlled budget for a tool (vendor portal only)"""
+    from app.db import set_vendor_budget
+    
+    if not set_vendor_budget(req.tool, req.total, req.commit, req.max_overage):
+        raise HTTPException(status_code=400, detail="Tool not found")
+    
+    # Also update pricing
+    if not update_budget_config(req.tool, req.total, req.commit, req.max_overage, req.commit_price, req.overage_price_per_license):
+        raise HTTPException(status_code=400, detail="Failed to update pricing")
+    
+    logger.info("vendor budget set tool=%s total=%d commit=%d max_overage=%d", req.tool, req.total, req.commit, req.max_overage)
+    return {"status": "ok", "tool": req.tool}
+
+
+@app.get("/api/vendor/budget/{tool}")
+def get_vendor_budget(tool: str):
+    """Get vendor and customer budget configuration"""
+    from app.db import get_budget_config
+    
+    config = get_budget_config(tool)
+    if not config:
+        raise HTTPException(status_code=404, detail="Tool not found")
+    
+    return config
 
 
 @app.get("/config", response_class=HTMLResponse)

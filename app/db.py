@@ -1,9 +1,12 @@
 import os
 import sqlite3
+import secrets
+import hashlib
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional, List
 from passlib.context import CryptContext
+from datetime import datetime
 
 
 DEFAULT_DB_PATH = "licenses.db"
@@ -124,7 +127,13 @@ def initialize_database(tools_config: Optional[List[dict]] = None, enable_multit
                     commit_qty INTEGER DEFAULT 0,
                     max_overage INTEGER DEFAULT 0,
                     commit_price REAL DEFAULT 0.0,
-                    overage_price_per_license REAL DEFAULT 0.0
+                    overage_price_per_license REAL DEFAULT 0.0,
+                    vendor_total INTEGER,
+                    vendor_commit_qty INTEGER,
+                    vendor_max_overage INTEGER,
+                    customer_total INTEGER,
+                    customer_commit_qty INTEGER,
+                    customer_max_overage INTEGER
                 )
                 """
             )
@@ -196,6 +205,29 @@ def initialize_database(tools_config: Optional[List[dict]] = None, enable_multit
                 )
                 """
             )
+        
+        # API Keys table (for tenant authentication)
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT,
+                key_hash TEXT NOT NULL UNIQUE,
+                name TEXT,
+                environment TEXT DEFAULT 'live',
+                created_at TEXT NOT NULL,
+                last_used_at TEXT,
+                expires_at TEXT,
+                status TEXT DEFAULT 'active',
+                scopes TEXT DEFAULT 'borrow,return,status',
+                FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id)
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_api_keys_status ON api_keys(status)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)")
+        
         if tools_config:
             for config in tools_config:
                 tool = config["tool"]
@@ -567,3 +599,316 @@ def provision_license_to_tenant(vendor_id: str, tenant_id: str, product_config: 
         return package_id
 
 
+
+
+# ============================================================================
+# API Key Management
+# ============================================================================
+
+def generate_api_key(tenant_id: Optional[str] = None, name: str = "Default Key", environment: str = "live") -> tuple[str, str]:
+    """
+    Generate a new API key for a tenant.
+    
+    Args:
+        tenant_id: Tenant ID (e.g., "acme") or None for single-tenant mode
+        name: Human-readable name for the key
+        environment: "live", "test", or "dev"
+    
+    Returns:
+        tuple: (api_key, key_id) - The plaintext key (show once!) and the database ID
+    """
+    # Generate cryptographically random key
+    random_part = secrets.token_urlsafe(32)  # 32 bytes = 43 chars in base64
+    
+    # Format: {tenant}_{env}_pk_{random} or just pk_{random} for single-tenant
+    if tenant_id:
+        api_key = f"{tenant_id}_{environment}_pk_{random_part}"
+    else:
+        api_key = f"{environment}_pk_{random_part}"
+    
+    # Hash the key for storage (never store plaintext!)
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    
+    # Create key ID
+    key_id = f"key_{secrets.token_hex(8)}"
+    
+    # Store in database
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        now = datetime.utcnow().isoformat()
+        
+        cur.execute(
+            """
+            INSERT INTO api_keys(id, tenant_id, key_hash, name, environment, created_at, status, scopes)
+            VALUES (?, ?, ?, ?, ?, ?, 'active', 'borrow,return,status')
+            """,
+            (key_id, tenant_id, key_hash, name, environment, now)
+        )
+        conn.commit()
+    
+    return (api_key, key_id)
+
+
+def validate_api_key(api_key: str) -> Optional[dict]:
+    """
+    Validate an API key and return tenant information.
+    
+    Args:
+        api_key: The API key to validate
+    
+    Returns:
+        dict with tenant info if valid, None if invalid
+        {
+            "key_id": "key_abc123",
+            "tenant_id": "acme" or None,
+            "environment": "live",
+            "scopes": ["borrow", "return", "status"]
+        }
+    """
+    if not api_key:
+        return None
+    
+    # Hash the provided key
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        now = datetime.utcnow().isoformat()
+        
+        # Find key by hash
+        cur.execute(
+            """
+            SELECT id, tenant_id, environment, status, scopes, expires_at
+            FROM api_keys
+            WHERE key_hash = ? AND status = 'active'
+            """,
+            (key_hash,)
+        )
+        row = cur.fetchone()
+        
+        if not row:
+            return None
+        
+        # Check expiration
+        if row["expires_at"] and row["expires_at"] < now:
+            return None
+        
+        # Update last_used_at
+        cur.execute(
+            "UPDATE api_keys SET last_used_at = ? WHERE id = ?",
+            (now, row["id"])
+        )
+        conn.commit()
+        
+        return {
+            "key_id": row["id"],
+            "tenant_id": row["tenant_id"],
+            "environment": row["environment"],
+            "scopes": row["scopes"].split(",") if row["scopes"] else []
+        }
+
+
+def revoke_api_key(key_id: str) -> bool:
+    """Revoke an API key by ID"""
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE api_keys SET status = 'revoked' WHERE id = ?",
+            (key_id,)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def list_api_keys(tenant_id: Optional[str] = None) -> List[dict]:
+    """List all API keys for a tenant (or all keys if tenant_id is None)"""
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        
+        if tenant_id:
+            cur.execute(
+                """
+                SELECT id, tenant_id, name, environment, created_at, last_used_at, status
+                FROM api_keys
+                WHERE tenant_id = ?
+                ORDER BY created_at DESC
+                """,
+                (tenant_id,)
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, tenant_id, name, environment, created_at, last_used_at, status
+                FROM api_keys
+                ORDER BY created_at DESC
+                """
+            )
+        
+        rows = cur.fetchall()
+        return [dict(row) for row in rows]
+
+
+# ============================================================================
+# Vendor-Controlled Budget Configuration
+# ============================================================================
+
+def set_vendor_budget(tool: str, total: int, commit_qty: int, max_overage: int) -> bool:
+    """
+    Vendor sets the maximum budget for a tool.
+    These are the limits that cannot be exceeded by the customer.
+    
+    Args:
+        tool: Tool name
+        total: Vendor-provisioned total licenses
+        commit_qty: Vendor-provisioned commit quantity
+        max_overage: Vendor-provisioned max overage
+    
+    Returns:
+        True if successful
+    """
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        
+        # Update vendor limits
+        cur.execute(
+            """
+            UPDATE licenses
+            SET vendor_total = ?,
+                vendor_commit_qty = ?,
+                vendor_max_overage = ?,
+                total = ?,
+                commit_qty = ?,
+                max_overage = ?
+            WHERE tool = ?
+            """,
+            (total, commit_qty, max_overage, total, commit_qty, max_overage, tool)
+        )
+        
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def set_customer_budget_restrictions(tool: str, total: int = None, commit_qty: int = None, max_overage: int = None) -> tuple[bool, str]:
+    """
+    Customer can ONLY restrict (lower) their budget, not exceed vendor limits.
+    
+    Args:
+        tool: Tool name
+        total: Customer-restricted total (must be <= vendor_total)
+        commit_qty: Customer-restricted commit (must be <= vendor_commit_qty)
+        max_overage: Customer-restricted overage (must be <= vendor_max_overage)
+    
+    Returns:
+        (success, error_message)
+    """
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        
+        # Get current vendor limits
+        cur.execute(
+            "SELECT vendor_total, vendor_commit_qty, vendor_max_overage, borrowed FROM licenses WHERE tool = ?",
+            (tool,)
+        )
+        row = cur.fetchone()
+        
+        if not row:
+            return False, "Tool not found"
+        
+        vendor_total = row["vendor_total"] or row["borrowed"] + 100  # Default if not set
+        vendor_commit = row["vendor_commit_qty"] or vendor_total
+        vendor_overage = row["vendor_max_overage"] or 0
+        borrowed = row["borrowed"]
+        
+        # Validate customer restrictions
+        if total is not None:
+            if total > vendor_total:
+                return False, f"Cannot exceed vendor limit of {vendor_total} total licenses"
+            if total < borrowed:
+                return False, f"Cannot reduce below currently borrowed ({borrowed})"
+        else:
+            total = vendor_total
+        
+        if commit_qty is not None:
+            if commit_qty > vendor_commit:
+                return False, f"Cannot exceed vendor limit of {vendor_commit} commit licenses"
+            if commit_qty > total:
+                return False, f"Commit quantity cannot exceed total ({total})"
+        else:
+            commit_qty = vendor_commit
+        
+        if max_overage is not None:
+            if max_overage > vendor_overage:
+                return False, f"Cannot exceed vendor limit of {vendor_overage} overage licenses"
+            if commit_qty + max_overage > total:
+                return False, f"Commit + overage cannot exceed total ({total})"
+        else:
+            max_overage = vendor_overage
+        
+        # Apply customer restrictions
+        cur.execute(
+            """
+            UPDATE licenses
+            SET customer_total = ?,
+                customer_commit_qty = ?,
+                customer_max_overage = ?,
+                total = ?,
+                commit_qty = ?,
+                max_overage = ?
+            WHERE tool = ?
+            """,
+            (total, commit_qty, max_overage, total, commit_qty, max_overage, tool)
+        )
+        
+        conn.commit()
+        return True, "Success"
+
+
+def get_budget_config(tool: str) -> Optional[dict]:
+    """
+    Get both vendor and customer budget configuration for a tool.
+    
+    Returns:
+        {
+            "tool": str,
+            "vendor_total": int,
+            "vendor_commit_qty": int,
+            "vendor_max_overage": int,
+            "customer_total": int or None,
+            "customer_commit_qty": int or None,
+            "customer_max_overage": int or None,
+            "active_total": int,
+            "active_commit_qty": int,
+            "active_max_overage": int,
+            "borrowed": int
+        }
+    """
+    with get_connection(False) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT tool, total, commit_qty, max_overage, borrowed,
+                   vendor_total, vendor_commit_qty, vendor_max_overage,
+                   customer_total, customer_commit_qty, customer_max_overage
+            FROM licenses
+            WHERE tool = ?
+            """,
+            (tool,)
+        )
+        row = cur.fetchone()
+        
+        if not row:
+            return None
+        
+        return {
+            "tool": row["tool"],
+            "vendor_total": row["vendor_total"],
+            "vendor_commit_qty": row["vendor_commit_qty"],
+            "vendor_max_overage": row["vendor_max_overage"],
+            "customer_total": row["customer_total"],
+            "customer_commit_qty": row["customer_commit_qty"],
+            "customer_max_overage": row["customer_max_overage"],
+            "active_total": row["total"],
+            "active_commit_qty": row["commit_qty"],
+            "active_max_overage": row["max_overage"],
+            "borrowed": row["borrowed"]
+        }

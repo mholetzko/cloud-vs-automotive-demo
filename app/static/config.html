@@ -128,6 +128,12 @@
         <h1>Budget Configuration</h1>
         <p>Configure total licenses, commit budgets, max overage limits, and pricing per tool</p>
       </div>
+      <div style="max-width: 1400px; margin: 0 auto 30px auto; padding: 20px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px;">
+        <p style="margin: 0; font-size: 1rem; color: #856404;">
+          <strong>ℹ️ Customer Restrictions Only:</strong> You can only <strong>reduce</strong> (restrict) the limits set by your vendor. 
+          To request higher limits, contact your vendor or see their provisioned maximums below.
+        </p>
+      </div>
       <div class="config-grid" id="config-list"></div>
     </main>
     <footer class="footer">
@@ -187,7 +193,7 @@
         const msg = document.getElementById(`msg-${tool}`);
         msg.className = 'message';
         msg.style.display = 'block';
-        msg.textContent = 'Saving...';
+        msg.textContent = 'Saving restrictions...';
         try {
           const r = await fetch('/config/budget', {
             method: 'PUT',
@@ -196,9 +202,9 @@
           });
           if (!r.ok) {
             const err = await r.json();
-            throw new Error(err.detail || 'Save failed');
+            throw new Error(err.detail || 'Restriction failed');
           }
-          msg.textContent = '✓ Saved successfully';
+          msg.textContent = '✓ Restrictions applied successfully';
           setTimeout(() => { msg.style.display = 'none'; }, 3000);
         } catch (e) {
           msg.className = 'message error';

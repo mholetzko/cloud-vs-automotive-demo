@@ -23,7 +23,7 @@ SIGNATURE_VALID_WINDOW = 300  # 5 minutes - prevents replay attacks
 REQUIRE_SIGNATURES = False  # Set to True to enforce (start with False for demo)
 
 
-def generate_signature(tool: str, user: str, timestamp: str, vendor_id: str = "techvendor") -> str:
+def generate_signature(tool: str, user: str, timestamp: str, api_key: str = "", vendor_id: str = "techvendor") -> str:
     """
     Generate HMAC signature for a request.
     This is what the client library does before sending a request.
@@ -32,6 +32,7 @@ def generate_signature(tool: str, user: str, timestamp: str, vendor_id: str = "t
         tool: The tool being borrowed
         user: The user requesting the license
         timestamp: Unix timestamp as string
+        api_key: API key (included in signature to bind it)
         vendor_id: Vendor identifier
     
     Returns:
@@ -40,8 +41,8 @@ def generate_signature(tool: str, user: str, timestamp: str, vendor_id: str = "t
     if vendor_id not in VENDOR_SECRETS:
         raise ValueError(f"Unknown vendor: {vendor_id}")
     
-    # Create payload: tool|user|timestamp
-    payload = f"{tool}|{user}|{timestamp}"
+    # Create payload: tool|user|timestamp|api_key (API key binds signature to tenant)
+    payload = f"{tool}|{user}|{timestamp}|{api_key}"
     
     # Generate HMAC signature
     signature = hmac.new(
@@ -58,6 +59,7 @@ def validate_signature(
     request: Request,
     tool: str,
     user: str,
+    api_key: str = "",
     require: bool = None
 ) -> tuple[bool, Optional[str]]:
     """
@@ -67,6 +69,7 @@ def validate_signature(
         request: FastAPI request object
         tool: The tool being borrowed
         user: The user requesting the license
+        api_key: API key from Authorization header
         require: Override global REQUIRE_SIGNATURES setting
     
     Returns:
@@ -107,8 +110,8 @@ def validate_signature(
         logger.warning(f"Invalid timestamp format: {timestamp}")
         return False, "Invalid timestamp format"
     
-    # Reconstruct expected signature
-    payload = f"{tool}|{user}|{timestamp}"
+    # Reconstruct expected signature (now includes API key)
+    payload = f"{tool}|{user}|{timestamp}|{api_key}"
     expected_signature = hmac.new(
         VENDOR_SECRETS[vendor_id].encode('utf-8'),
         payload.encode('utf-8'),

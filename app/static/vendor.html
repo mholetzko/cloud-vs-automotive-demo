@@ -279,6 +279,48 @@
           </tbody>
         </table>
       </div>
+
+      <div class="vendor-card">
+        <h2>⚙️ Customer Budget Management</h2>
+        <p style="margin-bottom: 20px; color: #666;">
+          Configure budget limits for deployed licenses. Customers can only restrict (lower) these limits on their side.
+        </p>
+        <div style="margin-bottom: 15px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 5px;">Select Tool:</label>
+          <select id="budget-tool-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+            <option value="">-- Select a tool --</option>
+            <option value="ECU Development Suite">ECU Development Suite</option>
+            <option value="GreenHills Multi IDE">GreenHills Multi IDE</option>
+            <option value="AUTOSAR Configuration Tool">AUTOSAR Configuration Tool</option>
+            <option value="CAN Bus Analyzer Pro">CAN Bus Analyzer Pro</option>
+            <option value="Model-Based Design Studio">Model-Based Design Studio</option>
+          </select>
+        </div>
+        <div id="budget-config-form" style="display: none;">
+          <div class="form-group">
+            <label>Total Licenses</label>
+            <input type="number" id="budget-total" min="1" required>
+            <small>Maximum licenses customer can use</small>
+          </div>
+          <div class="form-group">
+            <label>Commit Quantity</label>
+            <input type="number" id="budget-commit" min="0" required>
+            <small>Fixed allocation (always available)</small>
+          </div>
+          <div class="form-group">
+            <label>Max Overage</label>
+            <input type="number" id="budget-overage" min="0" required>
+            <small>Additional licenses (higher cost)</small>
+          </div>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0;"><strong>Current Status:</strong></p>
+            <p style="margin: 5px 0; font-size: 0.9rem;" id="budget-status-vendor"><strong>Vendor Limits:</strong> <span id="vendor-limits">-</span></p>
+            <p style="margin: 5px 0; font-size: 0.9rem;" id="budget-status-customer"><strong>Customer Restrictions:</strong> <span id="customer-limits">None set</span></p>
+            <p style="margin: 5px 0; font-size: 0.9rem;" id="budget-status-active"><strong>Active Config:</strong> <span id="active-limits">-</span></p>
+          </div>
+          <button type="button" class="btn" onclick="saveVendorBudget()">💾 Set Vendor Budget</button>
+        </div>
+      </div>
     </div>
 
     <!-- Add Customer Modal -->
@@ -516,6 +558,92 @@
           }
         });
       });
+
+      // Budget management
+      document.getElementById('budget-tool-select').addEventListener('change', async (e) => {
+        const tool = e.target.value;
+        const form = document.getElementById('budget-config-form');
+        
+        if (!tool) {
+          form.style.display = 'none';
+          return;
+        }
+        
+        form.style.display = 'block';
+        
+        // Load current budget config
+        try {
+          const response = await fetch(`/api/vendor/budget/${encodeURIComponent(tool)}`);
+          if (response.ok) {
+            const config = await response.json();
+            
+            // Set form values to vendor limits (or current if not set)
+            document.getElementById('budget-total').value = config.vendor_total || config.active_total;
+            document.getElementById('budget-commit').value = config.vendor_commit_qty || config.active_commit_qty;
+            document.getElementById('budget-overage').value = config.vendor_max_overage || config.active_max_overage;
+            
+            // Show status
+            const vendorLimits = config.vendor_total 
+              ? `${config.vendor_total} total (${config.vendor_commit_qty} commit, ${config.vendor_max_overage} overage)`
+              : 'Not set';
+            document.getElementById('vendor-limits').textContent = vendorLimits;
+            
+            const customerLimits = config.customer_total
+              ? `${config.customer_total} total (${config.customer_commit_qty} commit, ${config.customer_max_overage} overage)`
+              : 'None set';
+            document.getElementById('customer-limits').textContent = customerLimits;
+            
+            document.getElementById('active-limits').textContent = 
+              `${config.active_total} total (${config.active_commit_qty} commit, ${config.active_max_overage} overage)`;
+          }
+        } catch (err) {
+          console.error('Failed to load budget config:', err);
+        }
+      });
+      
+      async function saveVendorBudget() {
+        const tool = document.getElementById('budget-tool-select').value;
+        const total = parseInt(document.getElementById('budget-total').value);
+        const commit = parseInt(document.getElementById('budget-commit').value);
+        const overage = parseInt(document.getElementById('budget-overage').value);
+        
+        if (!tool || isNaN(total) || isNaN(commit) || isNaN(overage)) {
+          alert('Please fill in all fields');
+          return;
+        }
+        
+        if (commit + overage > total) {
+          alert('Commit + Overage cannot exceed Total');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/vendor/budget', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              tool,
+              total,
+              commit,
+              max_overage: overage,
+              commit_price: 0,
+              overage_price_per_license: 0
+            })
+          });
+          
+          if (response.ok) {
+            alert(`✅ Vendor budget set successfully!\n\nCustomers can now restrict (but not exceed) these limits:\n• Total: ${total}\n• Commit: ${commit}\n• Overage: ${overage}`);
+            // Reload to show updated status
+            document.getElementById('budget-tool-select').dispatchEvent(new Event('change'));
+          } else {
+            const error = await response.json();
+            alert('❌ Error: ' + error.detail);
+          }
+        } catch (err) {
+          alert('❌ Error saving budget');
+          console.error(err);
+        }
+      }
 
       // Load on page load
       loadCustomers();
