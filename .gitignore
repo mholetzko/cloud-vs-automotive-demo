@@ -15,3 +15,22 @@ clients/c/license_client.o
 clients/cpp/example.o
 clients/cpp/license_client_example
 clients/cpp/license_client.o
+
+# C/C++ object files
+**/*.o
+**/*.obj
+**/*.d
+**/*.a
+**/*.so
+**/*.dll
+**/*.dylib
+
+# Rust intermediates
+**/*.rcgu.o
+**/*.rmeta
+**/*.rlib
+**/*.d
+
+# Build dirs
+build/
+**/build/
