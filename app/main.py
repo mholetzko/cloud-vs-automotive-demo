@@ -649,6 +649,58 @@ def config_page():
         return f.read()
 
 
+# ============================================================================
+# CUSTOMER API KEY MANAGEMENT (self-service)
+# ============================================================================
+
+class CreateApiKeyRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    environment: str = Field("live")  # live | test | dev
+    tenant_id: Optional[str] = None  # demo: optional single-tenant
+
+
+@app.get("/api/keys")
+def list_api_keys_endpoint(tenant_id: Optional[str] = None):
+    """List API keys for the current customer (demo: tenant optional)."""
+    from .db import list_api_keys
+    try:
+        keys = list_api_keys(tenant_id)
+        return {"keys": keys}
+    except Exception as e:
+        logger.error(f"Error listing api keys: {e}")
+        raise HTTPException(500, "Failed to list API keys")
+
+
+@app.post("/api/keys")
+def create_api_key_endpoint(req: CreateApiKeyRequest):
+    """Generate a new API key (shown once)."""
+    from .db import generate_api_key
+    try:
+        api_key, key_id = generate_api_key(tenant_id=req.tenant_id, name=req.name, environment=req.environment)
+        logger.info("api_key_created key_id=%s tenant=%s env=%s", key_id, req.tenant_id, req.environment)
+        return {"key_id": key_id, "api_key": api_key}
+    except Exception as e:
+        logger.error(f"Error generating api key: {e}")
+        raise HTTPException(500, "Failed to generate API key")
+
+
+@app.delete("/api/keys/{key_id}")
+def revoke_api_key_endpoint(key_id: str):
+    """Revoke an API key by ID."""
+    from .db import revoke_api_key
+    try:
+        ok = revoke_api_key(key_id)
+        if not ok:
+            raise HTTPException(404, "API key not found")
+        logger.info("api_key_revoked key_id=%s", key_id)
+        return {"status": "revoked", "key_id": key_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking api key: {e}")
+        raise HTTPException(500, "Failed to revoke API key")
+
+
 @app.get("/security-demo", response_class=HTMLResponse)
 def security_demo_page():
     """Security demonstration page"""
