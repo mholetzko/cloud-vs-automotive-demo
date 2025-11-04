@@ -1,13 +1,16 @@
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+import asyncio
+import json
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, List
+from collections import deque
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
@@ -37,6 +40,101 @@ commit_gauge = Gauge("licenses_commit", "Commit quantity per tool", ["tool"])
 max_overage_gauge = Gauge("licenses_max_overage", "Max overage allowed per tool", ["tool"])
 at_max_overage_gauge = Gauge("licenses_at_max_overage", "Whether tool is at max overage (1) or not (0)", ["tool"])
 overage_checkouts = Counter("license_overage_checkouts_total", "Total overage checkouts", ["tool", "user"]) 
+
+
+# Real-time metrics buffer (keeps last 6 hours)
+# Each event is stored with timestamp for time-based retention
+REALTIME_RETENTION_HOURS = 6
+REALTIME_RETENTION_SECONDS = REALTIME_RETENTION_HOURS * 3600
+
+class RealtimeMetricsBuffer:
+    """Thread-safe buffer for real-time metrics with 6-hour retention"""
+    def __init__(self):
+        self.borrows = deque(maxlen=100000)  # ~28 per second for 6 hours
+        self.returns = deque(maxlen=100000)
+        self.failures = deque(maxlen=10000)
+        
+    def add_borrow(self, tool: str, user: str, is_overage: bool, borrow_id: str):
+        """Record a borrow event"""
+        event = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": "borrow",
+            "tool": tool,
+            "user": user,
+            "is_overage": is_overage,
+            "id": borrow_id
+        }
+        self.borrows.append(event)
+        self._cleanup_old_events()
+    
+    def add_return(self, borrow_id: str, user: str = None):
+        """Record a return event"""
+        event = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": "return",
+            "id": borrow_id,
+            "user": user
+        }
+        self.returns.append(event)
+        self._cleanup_old_events()
+    
+    def add_failure(self, tool: str, user: str, reason: str):
+        """Record a failure event"""
+        event = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": "failure",
+            "tool": tool,
+            "user": user,
+            "reason": reason
+        }
+        self.failures.append(event)
+        self._cleanup_old_events()
+    
+    def _cleanup_old_events(self):
+        """Remove events older than 6 hours"""
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=REALTIME_RETENTION_SECONDS)
+        cutoff_iso = cutoff.isoformat()
+        
+        # Clean borrows
+        while self.borrows and self.borrows[0]["timestamp"] < cutoff_iso:
+            self.borrows.popleft()
+        
+        # Clean returns
+        while self.returns and self.returns[0]["timestamp"] < cutoff_iso:
+            self.returns.popleft()
+        
+        # Clean failures
+        while self.failures and self.failures[0]["timestamp"] < cutoff_iso:
+            self.failures.popleft()
+    
+    def get_recent_events(self, seconds: int = 60):
+        """Get events from the last N seconds"""
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+        cutoff_iso = cutoff.isoformat()
+        
+        recent_borrows = [e for e in self.borrows if e["timestamp"] >= cutoff_iso]
+        recent_returns = [e for e in self.returns if e["timestamp"] >= cutoff_iso]
+        recent_failures = [e for e in self.failures if e["timestamp"] >= cutoff_iso]
+        
+        return {
+            "borrows": recent_borrows,
+            "returns": recent_returns,
+            "failures": recent_failures
+        }
+    
+    def get_stats_summary(self):
+        """Get summary statistics"""
+        return {
+            "total_events": len(self.borrows) + len(self.returns) + len(self.failures),
+            "borrow_count": len(self.borrows),
+            "return_count": len(self.returns),
+            "failure_count": len(self.failures),
+            "retention_hours": REALTIME_RETENTION_HOURS,
+            "oldest_event": self.borrows[0]["timestamp"] if self.borrows else None
+        }
+
+# Global instance
+realtime_buffer = RealtimeMetricsBuffer()
 
 
 class BorrowRequest(BaseModel):
@@ -137,6 +235,8 @@ def borrow(req: BorrowRequest):
         elif status["overage"] >= status["max_overage"]:
             reason = "max_overage"
         borrow_failures.labels(req.tool, reason).inc()
+        # Record failure in real-time buffer
+        realtime_buffer.add_failure(req.tool, req.user, reason)
         logger.warning("borrow failed tool=%s user=%s reason=%s", req.tool, req.user, reason)
         raise HTTPException(status_code=409, detail=f"No licenses available for {req.tool}")
     # update gauges
@@ -154,6 +254,9 @@ def borrow(req: BorrowRequest):
     if is_overage:
         overage_checkouts.labels(req.tool, req.user).inc()
     
+    # Record in real-time buffer
+    realtime_buffer.add_borrow(req.tool, req.user, is_overage, borrow_id)
+    
     overage_str = " (overage)" if is_overage else ""
     logger.info("borrow success tool=%s user=%s id=%s borrowed=%d/%d%s", req.tool, req.user, borrow_id, status["borrowed"], status["total"] if status else -1, overage_str)
     return BorrowResponse(id=borrow_id, tool=req.tool, user=req.user, borrowed_at=borrowed_at)
@@ -165,6 +268,10 @@ def return_(req: ReturnRequest) -> Dict[str, str]:
     if tool is None:
         logger.warning("return failed id=%s not_found=1", req.id)
         raise HTTPException(status_code=404, detail="Borrow record not found")
+    
+    # Record in real-time buffer
+    realtime_buffer.add_return(req.id)
+    
     status = get_status(tool)
     if status:
         borrowed_gauge.labels(tool).set(status["borrowed"])
@@ -231,6 +338,90 @@ def metrics():
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
 
+@app.get("/realtime/stats")
+def realtime_stats():
+    """Get real-time buffer statistics"""
+    return {
+        **realtime_buffer.get_stats_summary(),
+        "recent_60s": realtime_buffer.get_recent_events(60)
+    }
+
+
+@app.get("/realtime/stream")
+async def realtime_stream(request: Request):
+    """Server-Sent Events stream for real-time metrics"""
+    async def event_generator():
+        last_sent = time.time()
+        
+        while True:
+            # Check if client disconnected
+            if await request.is_disconnected():
+                logger.info("realtime stream client disconnected")
+                break
+            
+            # Send update every second
+            now = time.time()
+            if now - last_sent >= 1.0:
+                # Get current status for all tools
+                status_all_tools = []
+                try:
+                    tools = get_all_tools()
+                    for tool_data in tools:
+                        s = get_status(tool_data["tool"])
+                        if s:
+                            status_all_tools.append(s)
+                except Exception as e:
+                    logger.error(f"Error getting status in realtime stream: {e}")
+                
+                # Get recent events (last 60 seconds)
+                recent = realtime_buffer.get_recent_events(60)
+                
+                # Calculate rates
+                borrow_rate = len(recent["borrows"])  # per minute
+                return_rate = len(recent["returns"])  # per minute
+                failure_rate = len(recent["failures"])  # per minute
+                
+                # Calculate overage rate
+                total_borrows = len(recent["borrows"])
+                overage_borrows = sum(1 for b in recent["borrows"] if b.get("is_overage"))
+                overage_rate = (overage_borrows / total_borrows * 100) if total_borrows > 0 else 0
+                
+                # Build event data
+                data = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "tools": status_all_tools,
+                    "rates": {
+                        "borrow_per_min": borrow_rate,
+                        "return_per_min": return_rate,
+                        "failure_per_min": failure_rate,
+                        "overage_percent": round(overage_rate, 1)
+                    },
+                    "recent_events": {
+                        "borrows": recent["borrows"][-10:],  # Last 10
+                        "returns": recent["returns"][-10:],
+                        "failures": recent["failures"][-10:]
+                    },
+                    "buffer_stats": realtime_buffer.get_stats_summary()
+                }
+                
+                # Send as SSE
+                yield f"data: {json.dumps(data)}\n\n"
+                last_sent = now
+            
+            # Small sleep to prevent busy waiting
+            await asyncio.sleep(0.1)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
+
+
 # Static frontend
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -244,6 +435,12 @@ def root():
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page():
     with open("app/static/dashboard.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/realtime", response_class=HTMLResponse)
+def realtime_page():
+    with open("app/static/realtime.html", "r", encoding="utf-8") as f:
         return f.read()
 
 

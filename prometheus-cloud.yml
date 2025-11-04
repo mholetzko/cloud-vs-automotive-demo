@@ -2,15 +2,15 @@
 # Replace the remote_write values with your Grafana Cloud details
 
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 5s
+  evaluation_interval: 5s
   external_labels:
     cluster: 'fly-io'
     environment: 'production'
 
 scrape_configs:
   - job_name: 'license-server'
-    scrape_interval: 30s
+    scrape_interval: 5s  # Reduced from 30s for real-time demos
     scheme: https
     static_configs:
       - targets: ['license-server-demo.fly.dev']
