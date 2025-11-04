@@ -13,6 +13,8 @@ from contextlib import contextmanager
 import hmac
 import hashlib
 import time
+import os
+import urllib.parse
 
 
 class LicenseError(Exception):
@@ -117,10 +119,16 @@ class LicenseClient:
         self.timeout = timeout
         self.enable_security = enable_security
         self.session = requests.Session()
+        # Optional API key from environment (LICENSE_API_KEY)
+        self.api_key = os.environ.get("LICENSE_API_KEY")
     
     def _generate_signature(self, tool: str, user: str, timestamp: str) -> str:
         """Generate HMAC signature for request authentication"""
-        payload = f"{tool}|{user}|{timestamp}"
+        # Include API key in payload when present to bind signature to tenant
+        if self.api_key:
+            payload = f"{tool}|{user}|{timestamp}|{self.api_key}"
+        else:
+            payload = f"{tool}|{user}|{timestamp}"
         signature = hmac.new(
             self.VENDOR_SECRET.encode('utf-8'),
             payload.encode('utf-8'),
@@ -160,6 +168,8 @@ class LicenseClient:
                 "X-Timestamp": timestamp,
                 "X-Vendor-ID": self.VENDOR_ID
             }
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
         
         try:
             response = self.session.post(url, json=payload, headers=headers, timeout=self.timeout)
@@ -213,7 +223,9 @@ class LicenseClient:
         Raises:
             LicenseError: On error
         """
-        url = f"{self.base_url}/licenses/{tool}/status"
+        # URL-encode tool for path safety
+        encoded_tool = urllib.parse.quote(tool, safe='')
+        url = f"{self.base_url}/licenses/{encoded_tool}/status"
         
         try:
             response = self.session.get(url, timeout=self.timeout)
