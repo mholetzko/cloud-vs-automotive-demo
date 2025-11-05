@@ -191,8 +191,11 @@ else:
     logger.info("LOKI_URL not set - skipping direct Loki push (using stdout/Promtail only)")
 
 # Log OpenTelemetry status after logger is initialized
-if trace.get_tracer_provider().resource:
-    logger.info("OpenTelemetry tracing configured successfully")
+try:
+    if trace.get_tracer_provider() and hasattr(trace.get_tracer_provider(), 'resource'):
+        logger.info("OpenTelemetry tracing configured successfully")
+except Exception:
+    pass  # Skip if tracing not configured
 
 
 # Prometheus metrics
