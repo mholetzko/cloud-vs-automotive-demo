@@ -78,14 +78,18 @@
       "options": {
         "colorMode": "value",
         "graphMode": "area",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
           "calcs": ["lastNotNull"],
           "fields": ""
         },
-        "textMode": "auto"
+        "textMode": "value_and_name",
+        "textSize": {
+          "title": 16,
+          "value": 48
+        }
       },
       "alert": {
         "conditions": [
