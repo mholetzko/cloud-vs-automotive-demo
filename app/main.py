@@ -74,10 +74,10 @@ try:
     )
     trace_provider.add_span_processor(processor)
     trace.set_tracer_provider(trace_provider)
-    logger.info("OpenTelemetry tracing configured successfully")
 except Exception as e:
     # Don't fail app startup if OpenTelemetry config is wrong
-    logger.warning(f"Failed to configure OpenTelemetry tracing: {e}. App will continue without tracing.")
+    # Logger not initialized yet, use print
+    print(f"WARNING: Failed to configure OpenTelemetry tracing: {e}. App will continue without tracing.")
     trace.set_tracer_provider(TracerProvider(resource=resource))  # Fallback to no-op provider
 
 app = FastAPI(title="License Server", version="0.1.0")
@@ -189,6 +189,10 @@ if loki_url:
         # Continue without Loki push - console logging still works
 else:
     logger.info("LOKI_URL not set - skipping direct Loki push (using stdout/Promtail only)")
+
+# Log OpenTelemetry status after logger is initialized
+if trace.get_tracer_provider().resource:
+    logger.info("OpenTelemetry tracing configured successfully")
 
 
 # Prometheus metrics
