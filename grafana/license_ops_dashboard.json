@@ -93,7 +93,7 @@
             "evaluator": { "params": [5], "type": "gt" },
             "operator": { "type": "and" },
             "query": { "params": ["A", "1m", "now"] },
-            "reducer": { "params": [], "type": "last" },
+            "reducer": { "params": [], "type": "lastNotNull" },
             "type": "query"
           }
         ],
