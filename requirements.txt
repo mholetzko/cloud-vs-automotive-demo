@@ -11,5 +11,4 @@ opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-httpx
 opentelemetry-exporter-otlp-proto-http
-python-logging-loki
 

@@ -85,9 +85,8 @@ app = FastAPI(title="License Server", version="0.1.0")
 # Instrument FastAPI app with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
 
-# Structured logging with Loki push support
+# Structured logging - stdout only (Fly.io captures stdout automatically)
 import logging
-from logging_loki import LokiHandler
 
 # In-memory log buffer for scraping (keeps last 1000 log entries)
 class LogBuffer:
@@ -152,43 +151,9 @@ console_formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(mess
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 
-# Loki push handler (for Grafana Cloud or local Loki)
-loki_url = os.getenv("LOKI_URL")  # e.g., "https://logs-prod-XX-XX.grafana.net/loki/api/v1/push"
-loki_auth = os.getenv("LOKI_AUTH")  # e.g., "username:password" or "Bearer token"
-
-if loki_url:
-    try:
-        # Parse auth if provided
-        loki_handler_kwargs = {
-            "url": loki_url,
-            "tags": {"app": "license-server", "version": APP_VERSION},
-            "version": "1"
-        }
-        
-        if loki_auth:
-            if loki_auth.startswith("Bearer "):
-                loki_handler_kwargs["headers"] = {"Authorization": loki_auth}
-            elif ":" in loki_auth:
-                # Basic auth format: username:password
-                import base64
-                auth_bytes = loki_auth.encode('ascii')
-                auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
-                loki_handler_kwargs["headers"] = {"Authorization": f"Basic {auth_b64}"}
-            else:
-                # Assume it's a token
-                loki_handler_kwargs["headers"] = {"Authorization": f"Bearer {loki_auth}"}
-        
-        loki_handler = LokiHandler(**loki_handler_kwargs)
-        # Use simple formatter - Loki will parse the structured log messages
-        loki_formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
-        loki_handler.setFormatter(loki_formatter)
-        logger.addHandler(loki_handler)
-        logger.info("Loki push handler configured", extra={"loki_url": loki_url})
-    except Exception as e:
-        logger.warning(f"Failed to configure Loki push handler: {e}", exc_info=True)
-        # Continue without Loki push - console logging still works
-else:
-    logger.info("LOKI_URL not set - skipping direct Loki push (using stdout/Promtail only)")
+# Logging configured - stdout only (Fly.io captures stdout automatically)
+# View logs at: https://fly-metrics.net/d/fly-logs/fly-logs?orgId=1332768&var-app=license-server-demo
+logger.info("Logging configured - stdout only (Fly.io will capture logs automatically)")
 
 # Log OpenTelemetry status after logger is initialized
 try:
