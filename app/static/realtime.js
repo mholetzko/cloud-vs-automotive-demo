@@ -676,7 +676,7 @@ window.addEventListener('beforeunload', () => {
 // Log for debugging
 console.log('Real-Time Dashboard initialized');
 console.log('- SSE endpoint: /realtime/stream');
-console.log('- Update interval: 1 second');
+console.log('- Update interval: 2 seconds');
 console.log('- Data retention: 6 hours');
 console.log('- Default chart window: 30 minutes (configurable)');
 console.log('- Available ranges: 1min, 5min, 10min, 30min, 1h, 3h, 6h');

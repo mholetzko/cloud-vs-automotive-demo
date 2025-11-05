@@ -753,9 +753,9 @@ async def realtime_stream(request: Request):
                 logger.info("realtime stream client disconnected")
                 break
             
-            # Send update every second
+            # Send update every 2 seconds
             now = time.time()
-            if now - last_sent >= 1.0:
+            if now - last_sent >= 2.0:
                 # Get current status for all tools
                 status_all_tools = []
                 try:
