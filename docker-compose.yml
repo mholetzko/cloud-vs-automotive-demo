@@ -29,6 +29,7 @@ services:
     depends_on:
       - prometheus
       - loki
+      - tempo
 
   loki:
     image: grafana/loki:2.9.8
@@ -52,7 +53,20 @@ services:
     depends_on:
       - loki
 
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./tempo-config.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+      - "3200:3200"  # Tempo query
+
 volumes:
   loki-data:
+  tempo-data:
 
 

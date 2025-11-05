@@ -16,11 +16,37 @@ from fastapi.responses import HTMLResponse
 
 from .db import initialize_database, borrow_license, return_license, get_status, update_budget_config, get_all_tools, get_overage_charges, get_all_tenants, get_vendor_customers, provision_license_to_tenant
 
+# App version for observability/journey (surfaced in logs & API)
+APP_VERSION = os.getenv("APP_VERSION", "dev")
+
+# OpenTelemetry initialization
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+# Initialize OpenTelemetry
+resource = Resource.create({
+    "service.name": "license-server",
+    "service.version": APP_VERSION,
+})
+
+trace_provider = TracerProvider(resource=resource)
+processor = BatchSpanProcessor(
+    OTLPSpanExporter(
+        endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://tempo:4318/v1/traces"),
+        headers=os.getenv("OTEL_EXPORTER_OTLP_HEADERS", ""),
+    )
+)
+trace_provider.add_span_processor(processor)
+trace.set_tracer_provider(trace_provider)
 
 app = FastAPI(title="License Server", version="0.1.0")
 
-# App version for observability/journey (surfaced in logs & API)
-APP_VERSION = os.getenv("APP_VERSION", "dev")
+# Instrument FastAPI app with OpenTelemetry
+FastAPIInstrumentor.instrument_app(app)
 
 # Basic structured logging to stdout so Promtail/Loki can scrape container logs
 import logging
@@ -54,6 +80,15 @@ async def track_http_responses(request: Request, call_next):
     method = request.method
     start_time = time.perf_counter()
     
+    # Get OpenTelemetry trace context if available
+    span = trace.get_current_span()
+    trace_id = None
+    span_id = None
+    if span and span.get_span_context().is_valid:
+        trace_context = span.get_span_context()
+        trace_id = format(trace_context.trace_id, '032x')
+        span_id = format(trace_context.span_id, '016x')
+    
     try:
         response = await call_next(request)
         duration = time.perf_counter() - start_time
@@ -63,16 +98,21 @@ async def track_http_responses(request: Request, call_next):
         http_requests_total.labels(route=route, method=method, status_code=str(status)).inc()
         http_request_duration.labels(route=route, method=method, status_code=str(status)).observe(duration)
         
-        # Log request with trace ID
-        logger.info("request route=%s method=%s status=%d duration=%.3f request_id=%s", route, method, status, duration, request_id)
+        # Log request with trace ID and OpenTelemetry trace context
+        log_msg = f"request route={route} method={method} status={status} duration={duration:.3f} request_id={request_id}"
+        if trace_id:
+            log_msg += f" trace_id={trace_id} span_id={span_id}"
+        logger.info(log_msg)
         
         # Also track 500s specifically (for backward compatibility and easier alerting)
         if status == 500:
             http_500_total.labels(route=route).inc()
-            logger.warning("500 response route=%s method=%s request_id=%s", route, method, request_id)
+            logger.warning("500 response route=%s method=%s request_id=%s trace_id=%s", route, method, request_id, trace_id or "none")
         
-        # Add request ID to response header for traceability
+        # Add request ID and trace ID to response header for traceability
         response.headers["X-Request-ID"] = request_id
+        if trace_id:
+            response.headers["X-Trace-ID"] = trace_id
         return response
     except Exception as e:
         duration = time.perf_counter() - start_time
@@ -80,7 +120,8 @@ async def track_http_responses(request: Request, call_next):
         http_requests_total.labels(route=route, method=method, status_code="500").inc()
         http_request_duration.labels(route=route, method=method, status_code="500").observe(duration)
         http_500_total.labels(route=route).inc()
-        logger.error("unhandled exception route=%s method=%s request_id=%s duration=%.3f error=%s", route, method, request_id, duration, str(e))
+        logger.error("unhandled exception route=%s method=%s request_id=%s trace_id=%s duration=%.3f error=%s", 
+                     route, method, request_id, trace_id or "none", duration, str(e))
         raise
 
 

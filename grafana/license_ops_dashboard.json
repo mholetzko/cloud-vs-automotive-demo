@@ -137,24 +137,22 @@
       }
     },
     {
-      "type": "logs",
-      "title": "Recent Request IDs (Trace IDs)",
-      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 8 },
+      "type": "traces",
+      "title": "Request Traces",
+      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 12 },
       "targets": [
         {
+          "query": "{ service.name = \"license-server\" }",
+          "queryType": "traceql",
           "refId": "A",
-          "expr": "{app=\"license-server\"} |= \"request_id=\"",
-          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
-          "queryType": "range"
+          "datasource": { "type": "tempo", "uid": "${DS_TEMPO}" }
         }
       ],
       "options": {
-        "showTime": true,
-        "showLabels": false,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false,
-        "enableLogDetails": true,
-        "dedupStrategy": "none"
+        "showCommonLabels": false,
+        "showSpanLinks": true,
+        "dedupe": true,
+        "query": "{ service.name = \"license-server\" }"
       }
     },
     {
@@ -211,6 +209,12 @@
         "name": "DS_LOKI",
         "type": "datasource",
         "query": "loki",
+        "hide": 0
+      },
+      {
+        "name": "DS_TEMPO",
+        "type": "datasource",
+        "query": "tempo",
         "hide": 0
       }
     ]
