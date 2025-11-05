@@ -52,9 +52,62 @@ FastAPIInstrumentor.instrument_app(app)
 import logging
 from logging_loki import LokiHandler
 
+# In-memory log buffer for scraping (keeps last 1000 log entries)
+class LogBuffer:
+    def __init__(self, max_size=1000):
+        self.buffer = deque(maxlen=max_size)
+        self.lock = asyncio.Lock()
+    
+    def append(self, record):
+        """Append a log record to the buffer"""
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage(),
+            "pathname": record.pathname,
+            "lineno": record.lineno,
+        }
+        # Add extra fields if present
+        if hasattr(record, 'request_id'):
+            log_entry['request_id'] = record.request_id
+        if hasattr(record, 'trace_id'):
+            log_entry['trace_id'] = record.trace_id
+        self.buffer.append(log_entry)
+    
+    def get_recent_logs(self, limit=100):
+        """Get recent log entries in Promtail/Loki compatible format"""
+        recent = list(self.buffer)[-limit:]
+        # Format as plain text (one entry per line) for Promtail to scrape
+        lines = []
+        for entry in recent:
+            # Format: timestamp level name message [extra_fields]
+            line = f"{entry['timestamp']} {entry['level']} {entry['name']} {entry['message']}"
+            if 'request_id' in entry:
+                line += f" request_id={entry['request_id']}"
+            if 'trace_id' in entry:
+                line += f" trace_id={entry['trace_id']}"
+            lines.append(line)
+        return "\n".join(lines)
+
+# Global log buffer
+log_buffer = LogBuffer(max_size=1000)
+
+# Custom log handler that writes to buffer
+class BufferLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            log_buffer.append(record)
+        except Exception:
+            pass  # Don't fail if buffer append fails
+
 # Configure logging
 logger = logging.getLogger("license-server")
 logger.setLevel(logging.INFO)
+
+# Buffer handler (for scraping)
+buffer_handler = BufferLogHandler()
+logger.addHandler(buffer_handler)
 
 # Console handler (always active for local development and Fly.io stdout)
 console_handler = logging.StreamHandler()
@@ -149,12 +202,13 @@ async def track_http_responses(request: Request, call_next):
         log_msg = f"request route={route} method={method} status={status} duration={duration:.3f} request_id={request_id}"
         if trace_id:
             log_msg += f" trace_id={trace_id} span_id={span_id}"
-        logger.info(log_msg)
+        logger.info(log_msg, extra={"request_id": request_id, "trace_id": trace_id} if trace_id else {"request_id": request_id})
         
         # Also track 500s specifically (for backward compatibility and easier alerting)
         if status == 500:
             http_500_total.labels(route=route).inc()
-            logger.warning("500 response route=%s method=%s request_id=%s trace_id=%s", route, method, request_id, trace_id or "none")
+            logger.warning("500 response route=%s method=%s request_id=%s trace_id=%s", route, method, request_id, trace_id or "none", 
+                          extra={"request_id": request_id, "trace_id": trace_id} if trace_id else {"request_id": request_id})
         
         # Add request ID and trace ID to response header for traceability
         response.headers["X-Request-ID"] = request_id
@@ -168,7 +222,8 @@ async def track_http_responses(request: Request, call_next):
         http_request_duration.labels(route=route, method=method, status_code="500").observe(duration)
         http_500_total.labels(route=route).inc()
         logger.error("unhandled exception route=%s method=%s request_id=%s trace_id=%s duration=%.3f error=%s", 
-                     route, method, request_id, trace_id or "none", duration, str(e))
+                     route, method, request_id, trace_id or "none", duration, str(e),
+                     extra={"request_id": request_id, "trace_id": trace_id} if trace_id else {"request_id": request_id})
         raise
 
 
@@ -613,6 +668,28 @@ def status_all():
 def metrics():
     data = generate_latest()
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/logs")
+def logs(limit: int = 100):
+    """Get recent logs in plain text format for Promtail scraping
+    
+    Args:
+        limit: Maximum number of log entries to return (default 100, max 1000)
+    
+    Returns:
+        Plain text log entries, one per line, in format suitable for Promtail scraping
+    """
+    limit = min(max(limit, 1), 1000)  # Clamp between 1 and 1000
+    log_data = log_buffer.get_recent_logs(limit=limit)
+    return Response(
+        content=log_data,
+        media_type="text/plain",
+        headers={
+            "X-Log-Entries": str(limit),
+            "Cache-Control": "no-cache"
+        }
+    )
 
 
 @app.get("/realtime/stats")

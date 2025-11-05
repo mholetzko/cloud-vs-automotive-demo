@@ -9,6 +9,7 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
+  # Scrape Docker container logs (local development)
   - job_name: docker
     static_configs:
       - targets:
@@ -17,4 +18,10 @@ scrape_configs:
           job: docker-logs
           host: demo
           __path__: /var/lib/docker/containers/*/*-json.log
+
+  # Note: Promtail doesn't natively scrape HTTP endpoints
+  # For scraping from /logs endpoint, use one of these options:
+  # 1. Direct push (configured in app via LOKI_URL) - RECOMMENDED
+  # 2. Use a simple forwarder script that polls /logs and pushes to Loki
+  # 3. Use Promtail's HTTP push API (app pushes directly to Promtail)
 
