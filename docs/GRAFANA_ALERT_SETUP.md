@@ -7,7 +7,7 @@ This guide explains how to set up alerts in Grafana Cloud for the license server
 ### Option 1: Enable Alert from Dashboard (Recommended)
 
 1. **Open the Dashboard**:
-   - Navigate to: https://mholetzko.grafana.net/d/mhkzbqq/license-ops-overview
+   - Navigate to: https://mholetzko.grafana.net/d/mhmlqmj/license-ops-overview
    - The "500s last minute (max)" panel already has an alert configured
 
 2. **Enable the Alert**:
@@ -65,7 +65,7 @@ This guide explains how to set up alerts in Grafana Cloud for the license server
    ```
    summary: High 500 error rate detected
    description: Maximum 500 errors in last minute exceeded 5: {{ $value }}
-   dashboard: https://mholetzko.grafana.net/d/mhkzbqq/license-ops-overview
+   dashboard: https://mholetzko.grafana.net/d/mhmlqmj/license-ops-overview
    ```
 
 7. **Add Notification Channel**:
