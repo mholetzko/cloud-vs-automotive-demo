@@ -369,7 +369,7 @@ if not is_valid:
 
 ## 🚀 Next Steps
 
-1. **Run the demo**: `./demo-security-showcase.sh`
+1. **Visit the demo page**: Open `/security-demo` in your browser
 2. **Enable strict mode**: Set `REQUIRE_SIGNATURES=True`
 3. **Monitor logs**: Watch for failed auth attempts
 4. **Rotate secrets**: Every 90 days
