@@ -84,6 +84,7 @@
         <h2>Costs</h2>
         <div class="status-controls">
           <button id="refresh-costs" class="btn">Refresh</button>
+          <button id="trigger-fault" class="btn" style="background:#b71c1c; color:#fff;">Trigger Fault (500)</button>
         </div>
         <div id="costs" class="status" style="margin-top:8px"></div>
         
@@ -101,6 +102,22 @@
     </footer>
 
     <script src="/static/app.js"></script>
+    <script>
+      document.getElementById('trigger-fault').addEventListener('click', async () => {
+        const btn = document.getElementById('trigger-fault');
+        const prev = btn.textContent;
+        btn.textContent = 'Triggering...';
+        try {
+          const r = await fetch('/faulty');
+          const t = await r.text();
+          alert(`Response: ${r.status} ${r.statusText}\n${t}`);
+        } catch (e) {
+          alert('Network error');
+        } finally {
+          btn.textContent = prev;
+        }
+      });
+    </script>
   </body>
   </html>
 

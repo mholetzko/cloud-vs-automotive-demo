@@ -40,6 +40,7 @@ commit_gauge = Gauge("licenses_commit", "Commit quantity per tool", ["tool"])
 max_overage_gauge = Gauge("licenses_max_overage", "Max overage allowed per tool", ["tool"])
 at_max_overage_gauge = Gauge("licenses_at_max_overage", "Whether tool is at max overage (1) or not (0)", ["tool"])
 overage_checkouts = Counter("license_overage_checkouts_total", "Total overage checkouts", ["tool", "user"]) 
+http_500_total = Counter("license_http_500_total", "Total HTTP 500 responses emitted by the app", ["route"]) 
 
 
 # Real-time metrics buffer (keeps last 6 hours)
@@ -399,6 +400,18 @@ def borrow(req: BorrowRequest, request: Request):
     overage_str = " (overage)" if is_overage else ""
     logger.info("borrow success tool=%s user=%s id=%s borrowed=%d/%d%s", req.tool, req.user, borrow_id, status["borrowed"], status["total"] if status else -1, overage_str)
     return BorrowResponse(id=borrow_id, tool=req.tool, user=req.user, borrowed_at=borrowed_at)
+
+
+@app.get("/faulty")
+def faulty() -> Dict[str, str]:
+    """Deliberately return a 500 for demo/alerting purposes."""
+    try:
+        logger.debug("faulty endpoint triggered, simulating error")
+        raise RuntimeError("simulated failure for demo")
+    except Exception as e:
+        logger.error("faulty endpoint error=%s", str(e))
+        http_500_total.labels(route="/faulty").inc()
+        raise HTTPException(status_code=500, detail="Simulated failure")
 
 
 @app.post("/licenses/return")
