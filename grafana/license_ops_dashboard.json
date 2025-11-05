@@ -20,7 +20,7 @@
     {
       "type": "timeseries",
       "title": "HTTP 500s (rate/min)",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 10 },
       "targets": [
         {
           "refId": "A",
@@ -32,7 +32,7 @@
     {
       "type": "stat",
       "title": "500s last minute",
-      "gridPos": { "x": 12, "y": 8, "w": 4, "h": 8 },
+      "gridPos": { "x": 12, "y": 8, "w": 8, "h": 10 },
       "targets": [
         {
           "refId": "A",
