@@ -211,6 +211,45 @@
       margin-bottom: 0.6em;
       font-weight: 400;
     }
+    
+    /* PDF Export Styles */
+    @media print {
+      .back-link,
+      .reveal .controls,
+      .reveal .progress,
+      .reveal .slide-number,
+      .export-button {
+        display: none !important;
+      }
+      .reveal .slides section {
+        page-break-after: always;
+        page-break-inside: avoid;
+      }
+    }
+    
+    /* Export button */
+    .export-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: #000;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: background 0.2s;
+    }
+    .export-button:hover {
+      background: #00adef;
+    }
+    .export-button:active {
+      transform: scale(0.98);
+    }
   </style>
 </head>
 <body>
