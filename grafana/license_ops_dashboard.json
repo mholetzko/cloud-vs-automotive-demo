@@ -60,16 +60,102 @@
       }
     },
     {
-      "type": "stat",
-      "title": "Borrow attempts last minute",
-      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
+      "type": "table",
+      "title": "Status Codes per Endpoint (last 5m)",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(license_borrow_attempts_total[1m]))",
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+          "expr": "sum by (route, status_code) (increase(license_http_requests_total[5m])) > 0",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "format": "table",
+          "instant": true
         }
-      ]
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "route": 0,
+              "status_code": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "route": "Endpoint",
+              "status_code": "Status",
+              "Value": "Count"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Performance (p50, p95, p99)",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(license_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "legendFormat": "p50 - {{route}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(license_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "legendFormat": "p95 - {{route}}"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum(rate(license_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "legendFormat": "p99 - {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          }
+        }
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Recent Request IDs (Trace IDs)",
+      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{app=\"license-server\"} |= \"request_id=\"",
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
     },
     {
       "type": "piechart",
@@ -119,6 +205,12 @@
         "name": "DS_PROMETHEUS",
         "type": "datasource",
         "query": "prometheus",
+        "hide": 0
+      },
+      {
+        "name": "DS_LOKI",
+        "type": "datasource",
+        "query": "loki",
         "hide": 0
       }
     ]

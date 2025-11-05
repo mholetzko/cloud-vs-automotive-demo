@@ -43,33 +43,44 @@ overage_checkouts = Counter("license_overage_checkouts_total", "Total overage ch
 # HTTP status code metrics - tracks all responses by route and status code
 http_requests_total = Counter("license_http_requests_total", "Total HTTP requests by route and status code", ["route", "method", "status_code"])
 http_500_total = Counter("license_http_500_total", "Total HTTP 500 responses emitted by the app", ["route"])  # Kept for backward compatibility
+http_request_duration = Histogram("license_http_request_duration_seconds", "HTTP request duration in seconds", ["route", "method", "status_code"])
 
 
 @app.middleware("http")
 async def track_http_responses(request: Request, call_next):
-    """Track all HTTP responses by route, method, and status code."""
+    """Track all HTTP responses by route, method, status code, duration, and request ID."""
+    request_id = str(uuid.uuid4())[:8]  # Short request ID for traceability
+    route = request.url.path
+    method = request.method
+    start_time = time.perf_counter()
+    
     try:
         response = await call_next(request)
-        route = request.url.path
-        method = request.method
+        duration = time.perf_counter() - start_time
         status = response.status_code
         
         # Track all status codes
         http_requests_total.labels(route=route, method=method, status_code=str(status)).inc()
+        http_request_duration.labels(route=route, method=method, status_code=str(status)).observe(duration)
+        
+        # Log request with trace ID
+        logger.info("request route=%s method=%s status=%d duration=%.3f request_id=%s", route, method, status, duration, request_id)
         
         # Also track 500s specifically (for backward compatibility and easier alerting)
         if status == 500:
             http_500_total.labels(route=route).inc()
-            logger.warning("500 response route=%s method=%s", route, method)
+            logger.warning("500 response route=%s method=%s request_id=%s", route, method, request_id)
         
+        # Add request ID to response header for traceability
+        response.headers["X-Request-ID"] = request_id
         return response
     except Exception as e:
+        duration = time.perf_counter() - start_time
         # Catch unhandled exceptions (these become 500s)
-        route = request.url.path
-        method = request.method
         http_requests_total.labels(route=route, method=method, status_code="500").inc()
+        http_request_duration.labels(route=route, method=method, status_code="500").observe(duration)
         http_500_total.labels(route=route).inc()
-        logger.error("unhandled exception route=%s method=%s error=%s", route, method, str(e))
+        logger.error("unhandled exception route=%s method=%s request_id=%s duration=%.3f error=%s", route, method, request_id, duration, str(e))
         raise
 
 
