@@ -66,7 +66,18 @@ async def create_tenant(request: Request, ...):
 
 ## 📡 API Endpoints
 
-### Customer Management
+### Overview
+
+The Admin API covers **4 main areas**:
+
+1. **Customer/Tenant Management** - Create, list, update, delete customer tenants
+2. **Customer User Management** - Manage users within customer tenants
+3. **Vendor Management** - Create, list, update, delete vendors
+4. **Vendor User Management** - Manage users within vendors
+
+---
+
+### 1. Customer/Tenant Management
 
 #### Create Customer Tenant
 
@@ -148,7 +159,131 @@ Authorization: Bearer admin_live_...
 
 ---
 
-### Vendor Management
+### 2. Customer User Management
+
+#### List Tenant Users
+
+```http
+GET /api/admin/tenants/{tenant_id}/users
+Authorization: Bearer admin_live_...
+```
+
+**Response**:
+```json
+{
+  "users": [
+    {
+      "user_id": "user_abc123",
+      "email": "admin@acme.com",
+      "role": "admin",
+      "status": "active",
+      "created_at": "2025-11-06T10:00:00Z",
+      "last_login_at": "2025-11-06T15:30:00Z"
+    },
+    {
+      "user_id": "user_xyz789",
+      "email": "developer@acme.com",
+      "role": "developer",
+      "status": "active",
+      "created_at": "2025-11-06T11:00:00Z",
+      "last_login_at": null
+    }
+  ]
+}
+```
+
+#### Create User for Tenant
+
+```http
+POST /api/admin/tenants/{tenant_id}/users
+Authorization: Bearer admin_live_...
+Content-Type: application/json
+
+{
+  "email": "developer@acme.com",
+  "role": "developer",  // admin, developer, viewer
+  "send_invite": true  // Send invitation email
+}
+```
+
+**Response**:
+```json
+{
+  "user_id": "user_xyz789",
+  "tenant_id": "acme",
+  "email": "developer@acme.com",
+  "role": "developer",
+  "status": "pending_verification",
+  "setup_token": "setup_abc123",
+  "setup_link": "https://acme.permetrix.fly.dev/setup?token=setup_abc123",
+  "created_at": "2025-11-06T11:00:00Z"
+}
+```
+
+#### Get User Details
+
+```http
+GET /api/admin/users/{user_id}
+Authorization: Bearer admin_live_...
+```
+
+#### Update User
+
+```http
+PATCH /api/admin/users/{user_id}
+Authorization: Bearer admin_live_...
+Content-Type: application/json
+
+{
+  "role": "admin",  // Change role
+  "status": "suspended"  // Suspend user
+}
+```
+
+#### Delete User
+
+```http
+DELETE /api/admin/users/{user_id}
+Authorization: Bearer admin_live_...
+```
+
+#### Reset User Password
+
+```http
+POST /api/admin/users/{user_id}/reset-password
+Authorization: Bearer admin_live_...
+```
+
+**Response**:
+```json
+{
+  "user_id": "user_abc123",
+  "reset_token": "reset_xyz789",
+  "reset_link": "https://acme.permetrix.fly.dev/reset?token=reset_xyz789",
+  "expires_at": "2025-11-07T10:00:00Z"
+}
+```
+
+#### Invite User (Send Invitation Email)
+
+```http
+POST /api/admin/users/{user_id}/invite
+Authorization: Bearer admin_live_...
+```
+
+**Response**:
+```json
+{
+  "user_id": "user_xyz789",
+  "email": "developer@acme.com",
+  "invite_sent": true,
+  "invite_link": "https://acme.permetrix.fly.dev/setup?token=setup_abc123"
+}
+```
+
+---
+
+### 3. Vendor Management
 
 #### Create Vendor
 
@@ -209,48 +344,97 @@ Authorization: Bearer admin_live_...
 
 ---
 
-### User Management
+### 4. Vendor User Management
 
-#### List Tenant Users
-
-```http
-GET /api/admin/tenants/{tenant_id}/users
-Authorization: Bearer admin_live_...
-```
-
-#### Create User for Tenant
+#### List Vendor Users
 
 ```http
-POST /api/admin/tenants/{tenant_id}/users
-Authorization: Bearer admin_live_...
-Content-Type: application/json
-
-{
-  "email": "developer@acme.com",
-  "role": "developer",  // admin, developer, viewer
-  "send_invite": true  // Send invitation email
-}
-```
-
-#### Reset User Password
-
-```http
-POST /api/admin/users/{user_id}/reset-password
+GET /api/admin/vendors/{vendor_id}/users
 Authorization: Bearer admin_live_...
 ```
 
 **Response**:
 ```json
 {
-  "user_id": "user_abc123",
-  "reset_token": "reset_xyz789",
-  "reset_link": "https://acme.permetrix.fly.dev/reset?token=reset_xyz789"
+  "users": [
+    {
+      "user_id": "vendor_user_abc123",
+      "email": "sales@vector.com",
+      "role": "vendor_admin",
+      "status": "active",
+      "created_at": "2025-11-06T10:00:00Z",
+      "last_login_at": "2025-11-06T15:30:00Z"
+    },
+    {
+      "user_id": "vendor_user_xyz789",
+      "email": "support@vector.com",
+      "role": "vendor_sales",
+      "status": "active",
+      "created_at": "2025-11-06T11:00:00Z",
+      "last_login_at": null
+    }
+  ]
 }
+```
+
+#### Create User for Vendor
+
+```http
+POST /api/admin/vendors/{vendor_id}/users
+Authorization: Bearer admin_live_...
+Content-Type: application/json
+
+{
+  "email": "support@vector.com",
+  "role": "vendor_sales",  // vendor_admin, vendor_sales, vendor_support
+  "send_invite": true
+}
+```
+
+**Response**:
+```json
+{
+  "user_id": "vendor_user_xyz789",
+  "vendor_id": "vector",
+  "email": "support@vector.com",
+  "role": "vendor_sales",
+  "status": "pending_verification",
+  "setup_token": "setup_abc123",
+  "setup_link": "https://vendor.permetrix.fly.dev/setup?token=setup_abc123",
+  "created_at": "2025-11-06T11:00:00Z"
+}
+```
+
+#### Update Vendor User
+
+```http
+PATCH /api/admin/users/{user_id}
+Authorization: Bearer admin_live_...
+Content-Type: application/json
+
+{
+  "role": "vendor_admin",  // Change role
+  "status": "suspended"  // Suspend user
+}
+```
+
+#### Delete Vendor User
+
+```http
+DELETE /api/admin/users/{user_id}
+Authorization: Bearer admin_live_...
+```
+
+#### Reset Vendor User Password
+
+```http
+POST /api/admin/users/{user_id}/reset-password
+Authorization: Bearer admin_live_...
 ```
 
 ---
 
-### Platform Statistics
+### 5. Platform Statistics
 
 #### Get Platform Overview
 
