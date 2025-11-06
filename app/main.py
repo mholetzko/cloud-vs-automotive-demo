@@ -15,7 +15,7 @@ from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
-from .db import initialize_database, borrow_license, return_license, get_status, update_budget_config, get_all_tools, get_overage_charges, get_all_tenants, get_vendor_customers, provision_license_to_tenant
+from .db import initialize_database, borrow_license, return_license, get_status, update_budget_config, get_all_tools, get_overage_charges, get_all_tenants, get_vendor_customers, provision_license_to_tenant, create_tenant, create_vendor, get_all_vendors
 
 # App version for observability/journey (surfaced in logs & API)
 APP_VERSION = os.getenv("APP_VERSION", "dev")
@@ -1235,5 +1235,208 @@ def provision_license(req: ProvisionLicenseRequest):
     except Exception as e:
         logger.error(f"Error provisioning license: {e}")
         raise HTTPException(500, f"Failed to provision license: {str(e)}")
+
+
+# ============================================================================
+# ADMIN API ENDPOINTS
+# ============================================================================
+
+def verify_admin_api_key(request: Request) -> bool:
+    """Verify admin API key from Authorization header"""
+    auth_header = request.headers.get("Authorization", "")
+    
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(401, "Missing Authorization header")
+    
+    provided_key = auth_header.replace("Bearer ", "")
+    admin_key = os.getenv("PERMETRIX_ADMIN_API_KEY")
+    
+    if not admin_key:
+        raise HTTPException(500, "Admin API not configured. Set PERMETRIX_ADMIN_API_KEY environment variable.")
+    
+    if provided_key != admin_key:
+        logger.warning(f"Invalid admin API key attempt from {request.client.host}")
+        raise HTTPException(403, "Invalid admin API key")
+    
+    return True
+
+
+# Request models
+class CreateTenantRequest(BaseModel):
+    company_name: str
+    contact_email: str
+    tenant_id: Optional[str] = None
+    crm_id: Optional[str] = None
+    company_domain: Optional[str] = None
+
+
+class CreateVendorRequest(BaseModel):
+    vendor_name: str
+    contact_email: str
+    vendor_id: Optional[str] = None
+
+
+@app.post("/api/admin/tenants")
+async def admin_create_tenant(req: CreateTenantRequest, request: Request):
+    """Create a new customer tenant (Admin API)"""
+    verify_admin_api_key(request)
+    
+    try:
+        result = create_tenant(
+            company_name=req.company_name,
+            contact_email=req.contact_email,
+            tenant_id=req.tenant_id,
+            crm_id=req.crm_id,
+            company_domain=req.company_domain
+        )
+        logger.info(f"Admin created tenant: {result['tenant_id']} ({req.company_name})")
+        return result
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    except Exception as e:
+        logger.error(f"Error creating tenant: {e}")
+        raise HTTPException(500, f"Failed to create tenant: {str(e)}")
+
+
+@app.get("/api/admin/tenants")
+async def admin_list_tenants(request: Request):
+    """List all tenants (Admin API)"""
+    verify_admin_api_key(request)
+    
+    try:
+        tenants = get_all_tenants()
+        return {"tenants": tenants}
+    except Exception as e:
+        logger.error(f"Error listing tenants: {e}")
+        raise HTTPException(500, f"Failed to list tenants: {str(e)}")
+
+
+@app.get("/api/admin/tenants/{tenant_id}")
+async def admin_get_tenant(tenant_id: str, request: Request):
+    """Get tenant details (Admin API)"""
+    verify_admin_api_key(request)
+    
+    try:
+        tenants = get_all_tenants()
+        tenant = next((t for t in tenants if t["tenant_id"] == tenant_id), None)
+        if not tenant:
+            raise HTTPException(404, f"Tenant {tenant_id} not found")
+        return tenant
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting tenant: {e}")
+        raise HTTPException(500, f"Failed to get tenant: {str(e)}")
+
+
+@app.post("/api/admin/vendors")
+async def admin_create_vendor(req: CreateVendorRequest, request: Request):
+    """Create a new vendor (Admin API)"""
+    verify_admin_api_key(request)
+    
+    try:
+        result = create_vendor(
+            vendor_name=req.vendor_name,
+            contact_email=req.contact_email,
+            vendor_id=req.vendor_id
+        )
+        logger.info(f"Admin created vendor: {result['vendor_id']} ({req.vendor_name})")
+        return result
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    except Exception as e:
+        logger.error(f"Error creating vendor: {e}")
+        raise HTTPException(500, f"Failed to create vendor: {str(e)}")
+
+
+@app.get("/api/admin/vendors")
+async def admin_list_vendors(request: Request):
+    """List all vendors (Admin API)"""
+    verify_admin_api_key(request)
+    
+    try:
+        vendors = get_all_vendors()
+        return {"vendors": vendors}
+    except Exception as e:
+        logger.error(f"Error listing vendors: {e}")
+        raise HTTPException(500, f"Failed to list vendors: {str(e)}")
+
+
+@app.get("/api/admin/vendors/{vendor_id}")
+async def admin_get_vendor(vendor_id: str, request: Request):
+    """Get vendor details (Admin API)"""
+    verify_admin_api_key(request)
+    
+    try:
+        vendors = get_all_vendors()
+        vendor = next((v for v in vendors if v["vendor_id"] == vendor_id), None)
+        if not vendor:
+            raise HTTPException(404, f"Vendor {vendor_id} not found")
+        return vendor
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting vendor: {e}")
+        raise HTTPException(500, f"Failed to get vendor: {str(e)}")
+
+
+@app.get("/api/admin/stats")
+async def admin_platform_stats(request: Request):
+    """Get platform statistics (Admin API)"""
+    verify_admin_api_key(request)
+    
+    try:
+        initialize_database(enable_multitenant=True)
+        
+        with get_connection(True) as conn:
+            cur = conn.cursor()
+            
+            # Tenant stats
+            try:
+                cur.execute("SELECT COUNT(*) FROM tenants")
+                total_tenants = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM tenants WHERE status = 'active'")
+                active_tenants = cur.fetchone()[0]
+            except sqlite3.OperationalError:
+                total_tenants = 0
+                active_tenants = 0
+            
+            # Vendor stats
+            try:
+                cur.execute("SELECT COUNT(*) FROM vendors")
+                total_vendors = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM vendors WHERE status = 'active'")
+                active_vendors = cur.fetchone()[0]
+            except sqlite3.OperationalError:
+                total_vendors = 0
+                active_vendors = 0
+            
+            # License stats
+            try:
+                cur.execute("SELECT COUNT(*) FROM licenses")
+                total_licenses = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM borrows")
+                active_borrows = cur.fetchone()[0]
+            except sqlite3.OperationalError:
+                total_licenses = 0
+                active_borrows = 0
+        
+        return {
+            "tenants": {
+                "total": total_tenants,
+                "active": active_tenants
+            },
+            "vendors": {
+                "total": total_vendors,
+                "active": active_vendors
+            },
+            "licenses": {
+                "total_provisioned": total_licenses,
+                "active_borrows": active_borrows
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting platform stats: {e}")
+        raise HTTPException(500, f"Failed to get platform stats: {str(e)}")
 
 

@@ -1017,3 +1017,284 @@ def get_month_to_date_overage_cost(tool: str) -> float:
         price_row = cur.fetchone()
         price = float(price_row[0]) if isinstance(price_row, tuple) else float(price_row["overage_price_per_license"])
         return cnt * price
+
+
+# ============================================================================
+# Admin API Helper Functions
+# ============================================================================
+
+def slugify(text: str) -> str:
+    """Convert text to URL-friendly slug"""
+    import re
+    # Convert to lowercase and replace spaces/special chars with hyphens
+    text = text.lower()
+    text = re.sub(r'[^\w\s-]', '', text)
+    text = re.sub(r'[-\s]+', '-', text)
+    return text.strip('-')
+
+
+def create_tenant(company_name: str, contact_email: str, tenant_id: Optional[str] = None, 
+                  crm_id: Optional[str] = None, company_domain: Optional[str] = None) -> dict:
+    """
+    Create a new customer tenant.
+    
+    Returns:
+        dict with tenant_id, domain, admin_user_id, setup_token
+    """
+    import secrets
+    
+    # Generate tenant_id if not provided
+    if not tenant_id:
+        tenant_id = slugify(company_name)
+        # Ensure uniqueness
+        with get_connection(True) as conn:
+            cur = conn.cursor()
+            base_tenant_id = tenant_id
+            counter = 1
+            while True:
+                cur.execute("SELECT tenant_id FROM tenants WHERE tenant_id = ?", (tenant_id,))
+                if not cur.fetchone():
+                    break
+                tenant_id = f"{base_tenant_id}-{counter}"
+                counter += 1
+    
+    # Ensure multi-tenant tables exist
+    initialize_database(enable_multitenant=True)
+    
+    domain = f"{tenant_id}.permetrix.fly.dev"
+    setup_token = secrets.token_urlsafe(32)
+    now = datetime.utcnow().isoformat()
+    
+    with get_connection(readonly=False) as conn:
+        cur = conn.cursor()
+        
+        # Check if tenant already exists
+        cur.execute("SELECT tenant_id FROM tenants WHERE tenant_id = ?", (tenant_id,))
+        if cur.fetchone():
+            raise ValueError(f"Tenant {tenant_id} already exists")
+        
+        # Create tenant
+        cur.execute("""
+            INSERT INTO tenants (
+                tenant_id, company_name, domain, crm_id,
+                status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            tenant_id,
+            company_name,
+            domain,
+            crm_id,
+            "active",
+            now
+        ))
+        
+        # Create admin user
+        user_id = f"user_{secrets.token_hex(8)}"
+        password_hash = "pending"  # User sets on first login
+        
+        # Ensure users table has tenant_id column
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN tenant_id TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'admin'")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'pending_verification'")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN setup_token TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN created_at TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN last_login_at TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        # Create user (using email as username for now, but store user_id)
+        cur.execute("""
+            INSERT OR REPLACE INTO users (
+                username, password_hash, tenant_id, role, status,
+                setup_token, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            contact_email,  # username
+            password_hash,
+            tenant_id,
+            "admin",
+            "pending_verification",
+            setup_token,
+            now
+        ))
+        
+        # Update tenant with admin user
+        try:
+            cur.execute("ALTER TABLE tenants ADD COLUMN admin_user_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        cur.execute("""
+            UPDATE tenants SET admin_user_id = ? WHERE tenant_id = ?
+        """, (user_id, tenant_id))
+        
+        conn.commit()
+    
+    return {
+        "tenant_id": tenant_id,
+        "company_name": company_name,
+        "domain": domain,
+        "status": "active",
+        "admin_user_id": user_id,
+        "admin_email": contact_email,
+        "setup_token": setup_token,
+        "setup_link": f"https://{domain}/setup?token={setup_token}",
+        "created_at": now
+    }
+
+
+def create_vendor(vendor_name: str, contact_email: str, vendor_id: Optional[str] = None) -> dict:
+    """
+    Create a new vendor.
+    
+    Returns:
+        dict with vendor_id, api_key, admin_user_id, setup_token
+    """
+    import secrets
+    
+    # Generate vendor_id if not provided
+    if not vendor_id:
+        vendor_id = slugify(vendor_name)
+        # Ensure uniqueness
+        with get_connection(True) as conn:
+            cur = conn.cursor()
+            base_vendor_id = vendor_id
+            counter = 1
+            while True:
+                cur.execute("SELECT vendor_id FROM vendors WHERE vendor_id = ?", (vendor_id,))
+                if not cur.fetchone():
+                    break
+                vendor_id = f"{base_vendor_id}-{counter}"
+                counter += 1
+    
+    # Ensure multi-tenant tables exist
+    initialize_database(enable_multitenant=True)
+    
+    # Generate vendor API key
+    random_part = secrets.token_urlsafe(32)
+    api_key = f"vnd_live_{random_part}"
+    api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    
+    setup_token = secrets.token_urlsafe(32)
+    now = datetime.utcnow().isoformat()
+    
+    with get_connection(readonly=False) as conn:
+        cur = conn.cursor()
+        
+        # Check if vendor already exists
+        cur.execute("SELECT vendor_id FROM vendors WHERE vendor_id = ?", (vendor_id,))
+        if cur.fetchone():
+            raise ValueError(f"Vendor {vendor_id} already exists")
+        
+        # Ensure vendors table has required columns
+        try:
+            cur.execute("ALTER TABLE vendors ADD COLUMN status TEXT DEFAULT 'active'")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cur.execute("ALTER TABLE vendors ADD COLUMN admin_user_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        # Create vendor
+        cur.execute("""
+            INSERT INTO vendors (
+                vendor_id, vendor_name, contact_email,
+                api_key_hash, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            vendor_id,
+            vendor_name,
+            contact_email,
+            api_key_hash,
+            "active",
+            now
+        ))
+        
+        # Create admin user
+        user_id = f"vendor_user_{secrets.token_hex(8)}"
+        password_hash = "pending"
+        
+        # Ensure users table has vendor_id column
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN vendor_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        # Create vendor user
+        cur.execute("""
+            INSERT OR REPLACE INTO users (
+                username, password_hash, vendor_id, role, status,
+                setup_token, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            contact_email,
+            password_hash,
+            vendor_id,
+            "vendor_admin",
+            "pending_verification",
+            setup_token,
+            now
+        ))
+        
+        # Update vendor with admin user
+        cur.execute("""
+            UPDATE vendors SET admin_user_id = ? WHERE vendor_id = ?
+        """, (user_id, vendor_id))
+        
+        conn.commit()
+    
+    return {
+        "vendor_id": vendor_id,
+        "vendor_name": vendor_name,
+        "status": "active",
+        "api_key": api_key,  # ⚠️ Only shown once!
+        "admin_user_id": user_id,
+        "admin_email": contact_email,
+        "setup_token": setup_token,
+        "setup_link": f"https://vendor.permetrix.fly.dev/setup?token={setup_token}",
+        "created_at": now
+    }
+
+
+def get_all_vendors() -> List[dict]:
+    """Get all vendors"""
+    initialize_database(enable_multitenant=True)
+    with get_connection(True) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT 
+                    v.vendor_id, v.vendor_name, v.contact_email,
+                    v.status, v.created_at, u.username as admin_email
+                FROM vendors v
+                LEFT JOIN users u ON v.admin_user_id = u.username
+                ORDER BY v.vendor_name ASC
+            """)
+            rows = cur.fetchall()
+            return [dict(row) for row in rows]
+        except sqlite3.OperationalError:
+            # Table doesn't exist yet
+            return []
