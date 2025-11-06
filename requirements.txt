@@ -6,6 +6,7 @@ pytest
 httpx
 passlib
 itsdangerous
+python-multipart
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
