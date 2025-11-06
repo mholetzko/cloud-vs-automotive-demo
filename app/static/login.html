@@ -107,17 +107,29 @@
             errorDiv.style.display = 'none';
             
             try {
+                // Use form submission to properly handle cookies and redirects
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    credentials: 'include',  // Important: include cookies
+                    redirect: 'manual'  // Handle redirect manually
                 });
                 
-                if (response.ok) {
-                    // Redirect handled by server
-                    window.location.href = response.url || '/dashboard';
-                } else {
+                if (response.status === 302 || response.status === 200) {
+                    // Get redirect location from response
+                    const location = response.headers.get('Location');
+                    if (location) {
+                        window.location.href = location;
+                    } else {
+                        // If no redirect, check if we got a successful response
+                        window.location.href = '/dashboard';
+                    }
+                } else if (response.status === 401 || response.status === 403) {
                     const error = await response.json();
                     errorDiv.textContent = error.detail || 'Login failed';
+                    errorDiv.style.display = 'block';
+                } else {
+                    errorDiv.textContent = 'Login failed. Please try again.';
                     errorDiv.style.display = 'block';
                 }
             } catch (err) {

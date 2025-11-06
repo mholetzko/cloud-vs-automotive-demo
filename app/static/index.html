@@ -177,6 +177,14 @@
       <nav class="mb-nav">
         <a href="/presentation">Presentation</a>
         <a href="https://github.com/mholetzko/permetix" target="_blank">GitHub</a>
+        <span id="user-menu" style="display: none;">
+          <a href="/profile">Profile</a>
+          <a href="/settings">Settings</a>
+          <a href="/api/auth/logout">Logout</a>
+        </span>
+        <span id="login-link">
+          <a href="/login">Login</a>
+        </span>
       </nav>
     </header>
 
@@ -373,5 +381,24 @@
         <a href="https://github.com/mholetzko/permetix" target="_blank">GitHub</a>
       </div>
     </footer>
+    <script>
+      // Check if user is logged in and show/hide menu
+      async function checkAuth() {
+        try {
+          const response = await fetch('/api/auth/me', { credentials: 'include' });
+          if (response.ok) {
+            document.getElementById('user-menu').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+          } else {
+            document.getElementById('user-menu').style.display = 'none';
+            document.getElementById('login-link').style.display = 'inline';
+          }
+        } catch (err) {
+          document.getElementById('user-menu').style.display = 'none';
+          document.getElementById('login-link').style.display = 'inline';
+        }
+      }
+      checkAuth();
+    </script>
   </body>
 </html>

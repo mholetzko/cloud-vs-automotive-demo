@@ -1540,6 +1540,13 @@ def profile_page(user: dict = Depends(require_auth)):
         return f.read()
 
 
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(user: dict = Depends(require_auth)):
+    """User settings page"""
+    with open("app/static/settings.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
 @app.post("/api/auth/login")
 async def login(
     username: str = Form(...),
@@ -1605,27 +1612,26 @@ async def login(
     }
     session_token = serializer.dumps(session_data)
     
-    # Set cookie
-    response = Response()
+    # Determine redirect URL
+    if user_data.get("vendor_id"):
+        redirect_url = "/vendor"
+    elif user_data.get("tenant_id"):
+        redirect_url = "/dashboard"
+    else:
+        redirect_url = "/dashboard"
+    
+    # Create redirect response with cookie
     is_production = os.getenv("ENVIRONMENT") == "production" or "fly.dev" in os.getenv("FLY_APP_NAME", "")
+    response = RedirectResponse(url=redirect_url, status_code=302)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
         max_age=SESSION_MAX_AGE,
         httponly=True,
         secure=is_production,  # HTTPS only in production
-        samesite="lax"
+        samesite="lax",
+        path="/"
     )
-    
-    # Redirect based on role
-    if user_data.get("vendor_id"):
-        response.headers["Location"] = "/vendor"
-    elif user_data.get("tenant_id"):
-        response.headers["Location"] = "/dashboard"
-    else:
-        response.headers["Location"] = "/dashboard"
-    
-    response.status_code = 302
     return response
 
 
@@ -1673,25 +1679,26 @@ async def setup_password(
     }
     session_token = serializer.dumps(session_data)
     
-    response = Response()
+    # Determine redirect URL
+    if user_data.get("vendor_id"):
+        redirect_url = "/vendor"
+    elif user_data.get("tenant_id"):
+        redirect_url = "/dashboard"
+    else:
+        redirect_url = "/dashboard"
+    
+    # Create redirect response with cookie
+    is_production = os.getenv("ENVIRONMENT") == "production" or "fly.dev" in os.getenv("FLY_APP_NAME", "")
+    response = RedirectResponse(url=redirect_url, status_code=302)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
         max_age=SESSION_MAX_AGE,
         httponly=True,
-        secure=True,
-        samesite="lax"
+        secure=is_production,
+        samesite="lax",
+        path="/"
     )
-    
-    # Redirect based on role
-    if user_data.get("vendor_id"):
-        response.headers["Location"] = "/vendor"
-    elif user_data.get("tenant_id"):
-        response.headers["Location"] = "/dashboard"
-    else:
-        response.headers["Location"] = "/dashboard"
-    
-    response.status_code = 302
     return response
 
 

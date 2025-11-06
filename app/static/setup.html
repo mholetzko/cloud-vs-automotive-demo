@@ -138,12 +138,19 @@
             try {
                 const response = await fetch('/api/auth/setup', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    credentials: 'include',  // Important: include cookies
+                    redirect: 'manual'  // Handle redirect manually
                 });
                 
-                if (response.ok) {
-                    // Redirect handled by server
-                    window.location.href = response.url || '/dashboard';
+                if (response.status === 302 || response.status === 200) {
+                    // Get redirect location from response
+                    const location = response.headers.get('Location');
+                    if (location) {
+                        window.location.href = location;
+                    } else {
+                        window.location.href = '/dashboard';
+                    }
                 } else {
                     const error = await response.json();
                     errorDiv.textContent = error.detail || 'Setup failed';

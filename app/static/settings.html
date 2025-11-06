@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Permetrix</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .settings-container {
+            max-width: 800px;
+            margin: 48px auto;
+            padding: 0 48px;
+        }
+        .settings-section {
+            background: var(--mb-white);
+            border: 1px solid var(--mb-gray-300);
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        .settings-section h2 {
+            font-size: 18px;
+            font-weight: 400;
+            margin: 0 0 24px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--mb-black);
+        }
+        .form-group {
+            margin-bottom: 24px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--mb-gray-700);
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--mb-gray-300);
+            font-size: 14px;
+            background: var(--mb-white);
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--mb-blue);
+        }
+        .btn-primary {
+            padding: 12px 24px;
+            background: var(--mb-black);
+            color: var(--mb-white);
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary:hover {
+            background: var(--mb-gray-700);
+        }
+        .btn-secondary {
+            padding: 12px 24px;
+            background: transparent;
+            color: var(--mb-black);
+            border: 1px solid var(--mb-gray-300);
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            background: var(--mb-gray-100);
+        }
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            border: 1px solid #cfc;
+            display: none;
+        }
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            border: 1px solid #fcc;
+            display: none;
+        }
+        .user-info {
+            font-size: 14px;
+            color: var(--mb-gray-700);
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mb-header">
+        <div class="mb-brand">Permetrix</div>
+        <div class="mb-nav">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/profile">Profile</a>
+            <a href="/settings">Settings</a>
+            <a href="/api/auth/logout">Logout</a>
+        </div>
+    </div>
+    <div class="settings-container">
+        <h1 style="font-size: 32px; font-weight: 300; margin-bottom: 32px; letter-spacing: 2px;">Settings</h1>
+        
+        <div id="success-message" class="success-message"></div>
+        <div id="error-message" class="error-message"></div>
+        
+        <div class="settings-section">
+            <h2>Change Password</h2>
+            <div class="user-info">
+                Logged in as: <strong id="current-username"></strong>
+            </div>
+            <form id="change-password-form">
+                <div class="form-group">
+                    <label for="current-password">Current Password</label>
+                    <input type="password" id="current-password" name="current_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-password">New Password</label>
+                    <input type="password" id="new-password" name="new_password" required minlength="8">
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Confirm New Password</label>
+                    <input type="password" id="confirm-password" name="confirm_password" required minlength="8">
+                </div>
+                <button type="submit" class="btn-primary">Change Password</button>
+            </form>
+        </div>
+        
+        <div class="settings-section">
+            <h2>Account Information</h2>
+            <div class="user-info">
+                <div style="margin-bottom: 12px;"><strong>Username:</strong> <span id="settings-username"></span></div>
+                <div style="margin-bottom: 12px;"><strong>Role:</strong> <span id="settings-role"></span></div>
+                <div style="margin-bottom: 12px;"><strong>Tenant:</strong> <span id="settings-tenant"></span></div>
+                <div style="margin-bottom: 12px;"><strong>Vendor:</strong> <span id="settings-vendor"></span></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/auth/me', { credentials: 'include' });
+                if (response.ok) {
+                    const user = await response.json();
+                    document.getElementById('current-username').textContent = user.username || 'N/A';
+                    document.getElementById('settings-username').textContent = user.username || 'N/A';
+                    document.getElementById('settings-role').textContent = user.role || 'user';
+                    document.getElementById('settings-tenant').textContent = user.tenant_id || 'N/A';
+                    document.getElementById('settings-vendor').textContent = user.vendor_id || 'N/A';
+                } else {
+                    window.location.href = '/login';
+                }
+            } catch (err) {
+                console.error('Error loading user info:', err);
+                window.location.href = '/login';
+            }
+        }
+        
+        document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const newPassword = formData.get('new_password');
+            const confirmPassword = formData.get('confirm_password');
+            const successDiv = document.getElementById('success-message');
+            const errorDiv = document.getElementById('error-message');
+            
+            successDiv.style.display = 'none';
+            errorDiv.style.display = 'none';
+            
+            if (newPassword !== confirmPassword) {
+                errorDiv.textContent = 'New passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        current_password: formData.get('current_password'),
+                        new_password: newPassword
+                    })
+                });
+                
+                if (response.ok) {
+                    successDiv.textContent = 'Password changed successfully';
+                    successDiv.style.display = 'block';
+                    e.target.reset();
+                } else {
+                    const error = await response.json();
+                    errorDiv.textContent = error.detail || 'Failed to change password';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.textContent = 'Network error. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+        
+        loadUserInfo();
+    </script>
+</body>
+</html>
+
