@@ -1553,28 +1553,46 @@ async def login(
     # Get user details
     with get_connection(True) as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT username, tenant_id, vendor_id, role, status
-            FROM users WHERE username = ?
-        """, (username,))
+        # Try to get all columns, but handle missing columns gracefully
+        try:
+            cur.execute("""
+                SELECT username, tenant_id, vendor_id, role, status
+                FROM users WHERE username = ?
+            """, (username,))
+        except sqlite3.OperationalError:
+            # Fallback if columns don't exist yet
+            cur.execute("""
+                SELECT username
+                FROM users WHERE username = ?
+            """, (username,))
+        
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=401, detail="User not found")
         
         user_data = dict(row)
         
-        # Check if user is active
+        # Check if user is active (if status column exists)
         if user_data.get("status") == "deleted":
             raise HTTPException(status_code=403, detail="Account has been deleted")
         
-        # Update last login
+        # Update last login (if column exists)
         try:
             with get_connection(False) as conn2:
                 cur2 = conn2.cursor()
-                cur2.execute("""
-                    UPDATE users SET last_login_at = ? WHERE username = ?
-                """, (datetime.now(timezone.utc).isoformat(), username))
-                conn2.commit()
+                # Try to add column if it doesn't exist
+                try:
+                    cur2.execute("ALTER TABLE users ADD COLUMN last_login_at TEXT")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+                
+                try:
+                    cur2.execute("""
+                        UPDATE users SET last_login_at = ? WHERE username = ?
+                    """, (datetime.now(timezone.utc).isoformat(), username))
+                    conn2.commit()
+                except sqlite3.OperationalError:
+                    pass  # Column doesn't exist, skip
         except Exception:
             pass  # Non-critical
     
