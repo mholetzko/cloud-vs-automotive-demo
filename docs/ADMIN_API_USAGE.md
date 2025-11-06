@@ -297,6 +297,90 @@ curl -X POST https://permetrix.fly.dev/api/admin/vendors \
 
 5. **Audit Logging**: All Admin API operations are logged. Monitor these logs for security.
 
+### Delete Tenant
+
+Delete a tenant (customer). Supports both soft delete (default) and hard delete.
+
+**Endpoint**: `DELETE /api/admin/tenants/{tenant_id}`
+
+**Query Parameters**:
+- `hard_delete` (optional, default: `false`): If `true`, permanently delete. If `false`, soft delete (mark as deleted).
+
+**Soft Delete** (default):
+- Marks tenant as `status='deleted'`
+- Preserves all data for recovery
+- Safe for production use
+
+**Hard Delete**:
+- Permanently removes tenant and all related data
+- ⚠️ **Cannot be undone!**
+- Requires all licenses to be returned first
+- Use for testing/cleanup only
+
+**Response**:
+```json
+{
+  "tenant_id": "acme",
+  "company_name": "Acme Corporation",
+  "status": "deleted",
+  "deletion_type": "soft",
+  "message": "Tenant acme (Acme Corporation) marked as deleted (soft delete)"
+}
+```
+
+**Examples**:
+```bash
+# Soft delete (default)
+curl -X DELETE https://permetrix.fly.dev/api/admin/tenants/acme \
+  -H "Authorization: Bearer $PERMETRIX_ADMIN_API_KEY"
+
+# Hard delete (permanent)
+curl -X DELETE "https://permetrix.fly.dev/api/admin/tenants/acme?hard_delete=true" \
+  -H "Authorization: Bearer $PERMETRIX_ADMIN_API_KEY"
+```
+
+### Delete Vendor
+
+Delete a vendor. Supports both soft delete (default) and hard delete.
+
+**Endpoint**: `DELETE /api/admin/vendors/{vendor_id}`
+
+**Query Parameters**:
+- `hard_delete` (optional, default: `false`): If `true`, permanently delete. If `false`, soft delete (mark as deleted).
+
+**Soft Delete** (default):
+- Marks vendor as `status='deleted'`
+- Preserves all data for recovery
+- Safe for production use
+
+**Hard Delete**:
+- Permanently removes vendor and all related data
+- ⚠️ **Cannot be undone!**
+- Requires all license packages to be removed first
+- Use for testing/cleanup only
+
+**Response**:
+```json
+{
+  "vendor_id": "techvendor",
+  "vendor_name": "TechVendor Software Inc",
+  "status": "deleted",
+  "deletion_type": "hard",
+  "message": "Vendor techvendor (TechVendor Software Inc) permanently deleted"
+}
+```
+
+**Examples**:
+```bash
+# Soft delete (default)
+curl -X DELETE https://permetrix.fly.dev/api/admin/vendors/techvendor \
+  -H "Authorization: Bearer $PERMETRIX_ADMIN_API_KEY"
+
+# Hard delete (permanent)
+curl -X DELETE "https://permetrix.fly.dev/api/admin/vendors/techvendor?hard_delete=true" \
+  -H "Authorization: Bearer $PERMETRIX_ADMIN_API_KEY"
+```
+
 ## Next Steps
 
 After creating tenants and vendors via the Admin API:
@@ -305,4 +389,24 @@ After creating tenants and vendors via the Admin API:
 2. **Vendor Setup**: Vendors receive a setup link and their API key for client library integration
 3. **License Provisioning**: Vendors can provision licenses to customers via the vendor portal
 4. **API Key Generation**: Customers can generate their own API keys via the customer config page
+
+## Cleanup for Testing
+
+When testing, you can clean up test data:
+
+```bash
+# List all tenants
+curl https://permetrix.fly.dev/api/admin/tenants \
+  -H "Authorization: Bearer $PERMETRIX_ADMIN_API_KEY"
+
+# Hard delete test tenant (permanent)
+curl -X DELETE "https://permetrix.fly.dev/api/admin/tenants/test-tenant?hard_delete=true" \
+  -H "Authorization: Bearer $PERMETRIX_ADMIN_API_KEY"
+
+# Hard delete test vendor (permanent)
+curl -X DELETE "https://permetrix.fly.dev/api/admin/vendors/test-vendor?hard_delete=true" \
+  -H "Authorization: Bearer $PERMETRIX_ADMIN_API_KEY"
+```
+
+⚠️ **Warning**: Hard delete is permanent and cannot be undone. Use soft delete in production.
 
